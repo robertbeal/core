@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 import logging
 
 from yoto_api import AuthenticationError, YotoManager, YotoPlayer
@@ -37,6 +38,23 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             update_interval=SCAN_INTERVAL,
         )
         self.manager = manager
+
+    async def _async_setup(self) -> None:
+        """Connect to MQTT events for real-time push updates."""
+        await self.hass.async_add_executor_job(
+            self.manager.connect_to_events, self._handle_mqtt_event
+        )
+
+    def _handle_mqtt_event(self) -> None:
+        """Handle an MQTT event from the yoto-api background thread.
+
+        This callback is invoked by paho-mqtt from a background thread,
+        so we must use call_soon_threadsafe to marshal the update onto
+        the event loop.
+        """
+        self.hass.loop.call_soon_threadsafe(
+            partial(self.async_set_updated_data, self.manager.players)
+        )
 
     async def _async_update_data(self) -> dict[str, YotoPlayer]:
         """Fetch player data from the Yoto API."""

@@ -1,9 +1,11 @@
 """Tests for the Yoto coordinator."""
 
+from threading import Thread
 from unittest.mock import MagicMock
 
 from yoto_api import AuthenticationError, YotoPlayer
 
+from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_TOKEN
 from homeassistant.core import HomeAssistant
@@ -151,3 +153,85 @@ async def test_coordinator_skips_persist_when_token_unchanged(
     # Config entry data should be the same object — no update call made
     assert mock_config_entry.data[CONF_TOKEN] == "mock-refresh-token"
     assert mock_config_entry.version == version_before
+
+
+PLAYER_ID = "player-1"
+ENTITY_ID = "media_player.my_yoto"
+
+
+def _make_player(**overrides: object) -> YotoPlayer:
+    """Create a YotoPlayer with sensible defaults."""
+    defaults = {
+        "id": PLAYER_ID,
+        "name": "My Yoto",
+        "device_type": "v3",
+        "online": True,
+        "firmware_version": "1.2.3",
+    }
+    return YotoPlayer(**{**defaults, **overrides})
+
+
+async def test_coordinator_connects_to_events(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Coordinator should connect to MQTT events during setup."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    mock_yoto_manager.connect_to_events.assert_called_once()
+
+
+async def test_mqtt_callback_updates_entities(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """MQTT callback should push updated player data to entities."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.state == MediaPlayerState.IDLE
+
+    # Simulate MQTT pushing a playing state — the library mutates the
+    # player in-place, then invokes the callback from a background thread.
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(playback_status="playing")
+
+    # Retrieve the callback that the coordinator registered
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+
+    # Fire the callback from a background thread, as paho-mqtt would
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.state == MediaPlayerState.PLAYING
+
+
+async def test_coordinator_disconnects_on_unload(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Coordinator should disconnect MQTT on unload."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    await hass.config_entries.async_unload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    mock_yoto_manager.disconnect.assert_called_once()
