@@ -130,3 +130,93 @@ async def test_switch_entities_are_config_category(
     entry = ent_reg.async_get("switch.my_yoto_day_auto_brightness")
     assert entry is not None
     assert entry.entity_category == EntityCategory.CONFIG
+
+
+async def test_end_of_track_sleep_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """End of track sleep should be on when sleep timer matches remaining track time."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        track_length=180,
+        track_position=60,
+        sleep_timer_seconds_remaining=120,
+    )
+
+    state = hass.states.get("switch.my_yoto_end_of_track_sleep")
+    assert state is not None
+    assert state.state == "on"
+
+
+async def test_end_of_track_sleep_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """End of track sleep should be off when sleep timer does not match."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        track_length=180,
+        track_position=60,
+        sleep_timer_seconds_remaining=0,
+    )
+
+    state = hass.states.get("switch.my_yoto_end_of_track_sleep")
+    assert state is not None
+    assert state.state == "off"
+
+
+async def test_end_of_track_sleep_turn_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Turning on should set sleep timer to remaining track time."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        track_length=180,
+        track_position=60,
+        sleep_timer_seconds_remaining=0,
+    )
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: "switch.my_yoto_end_of_track_sleep"},
+        blocking=True,
+    )
+
+    mock_yoto_manager.set_sleep.assert_called_once_with(PLAYER_ID, 120)
+
+
+async def test_end_of_track_sleep_turn_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Turning off should set sleep timer to 0."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        track_length=180,
+        track_position=60,
+        sleep_timer_seconds_remaining=120,
+    )
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_OFF,
+        {ATTR_ENTITY_ID: "switch.my_yoto_end_of_track_sleep"},
+        blocking=True,
+    )
+
+    mock_yoto_manager.set_sleep.assert_called_once_with(PLAYER_ID, 0)

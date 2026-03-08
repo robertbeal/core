@@ -21,6 +21,8 @@ from . import YotoConfigEntry
 from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
 
+PARALLEL_UPDATES = 1
+
 
 @dataclass(frozen=True, kw_only=True)
 class YotoLightEntityDescription(YotoEntityDescription, LightEntityDescription):

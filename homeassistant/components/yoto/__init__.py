@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 
 from .const import CLIENT_ID, DOMAIN
 from .coordinator import YotoDataUpdateCoordinator
@@ -67,3 +68,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: YotoConfigEntry) -> boo
         await hass.async_add_executor_job(coordinator.manager.disconnect)
 
     return unload
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: YotoConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Remove a config entry from a device."""
+    return True

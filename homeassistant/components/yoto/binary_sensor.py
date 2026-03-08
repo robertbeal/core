@@ -20,6 +20,8 @@ from . import YotoConfigEntry
 from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
 
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True, kw_only=True)
 class YotoBinarySensorEntityDescription(
@@ -49,12 +51,33 @@ BINARY_SENSORS: tuple[YotoBinarySensorEntityDescription, ...] = (
         translation_key="bluetooth_audio_connected",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
         value_fn=lambda player: player.bluetooth_audio_connected,
     ),
     YotoBinarySensorEntityDescription(
         key="sleep_timer",
         translation_key="sleep_timer",
         value_fn=lambda player: player.sleep_timer_active,
+    ),
+    YotoBinarySensorEntityDescription(
+        key="day_mode",
+        translation_key="day_mode",
+        value_fn=lambda player: player.day_mode_on,
+    ),
+    YotoBinarySensorEntityDescription(
+        key="audio_device_connected",
+        translation_key="audio_device_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_registry_enabled_default=False,
+        value_fn=lambda player: player.audio_device_connected,
+    ),
+    YotoBinarySensorEntityDescription(
+        key="night_light_mode",
+        translation_key="night_light_mode",
+        entity_registry_enabled_default=False,
+        value_fn=lambda player: player.night_light_mode != "off"
+        if player.night_light_mode is not None
+        else None,
     ),
 )
 

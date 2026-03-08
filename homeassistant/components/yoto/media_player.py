@@ -21,6 +21,7 @@ from . import YotoConfigEntry
 from .const import DOMAIN
 from .coordinator import YotoDataUpdateCoordinator
 
+PARALLEL_UPDATES = 1
 YOTO_VOLUME_MAX = 16
 
 PLAYBACK_STATE_MAP: dict[str | None, MediaPlayerState] = {

@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
+from typing import Any
 
-from yoto_api import YotoPlayer, YotoPlayerConfig
+from yoto_api import YotoManager, YotoPlayer, YotoPlayerConfig
 
 from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
 )
-from homeassistant.const import EntityCategory, PERCENTAGE
+from homeassistant.const import EntityCategory, PERCENTAGE, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -19,14 +20,31 @@ from . import YotoConfigEntry
 from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
 
+PARALLEL_UPDATES = 1
+
+
+def _set_player_config_field(
+    manager: YotoManager, player_id: str, field: str, value: float
+) -> None:
+    """Set a single field on YotoPlayerConfig and push to the API."""
+    config = YotoPlayerConfig()
+    setattr(config, field, int(value))
+    manager.set_player_config(player_id, config)
+
+
+def _set_sleep_timer(
+    manager: YotoManager, player_id: str, value: float
+) -> None:
+    """Set the sleep timer via the API."""
+    manager.set_sleep(player_id, int(value))
+
 
 @dataclass(frozen=True, kw_only=True)
 class YotoNumberEntityDescription(YotoEntityDescription, NumberEntityDescription):
     """Description of a Yoto number entity."""
 
     value_fn: Callable[[YotoPlayer], float | None]
-    config_field: str
-    convert_fn: Callable[[float], int | str]
+    set_fn: Callable[[YotoManager, str, float], None]
 
 
 def _brightness_value(player: YotoPlayer, field: str) -> float | None:
@@ -50,8 +68,9 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         value_fn=lambda player: float(player.config.day_max_volume_limit)
         if player.config and player.config.day_max_volume_limit is not None
         else None,
-        config_field="day_max_volume_limit",
-        convert_fn=int,
+        set_fn=lambda manager, player_id, value: _set_player_config_field(
+            manager, player_id, "day_max_volume_limit", value
+        ),
     ),
     YotoNumberEntityDescription(
         key="night_max_volume_limit",
@@ -63,8 +82,9 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         value_fn=lambda player: float(player.config.night_max_volume_limit)
         if player.config and player.config.night_max_volume_limit is not None
         else None,
-        config_field="night_max_volume_limit",
-        convert_fn=int,
+        set_fn=lambda manager, player_id, value: _set_player_config_field(
+            manager, player_id, "night_max_volume_limit", value
+        ),
     ),
     YotoNumberEntityDescription(
         key="day_display_brightness",
@@ -75,8 +95,9 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         native_step=1,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda player: _brightness_value(player, "day_display_brightness"),
-        config_field="day_display_brightness",
-        convert_fn=int,
+        set_fn=lambda manager, player_id, value: _set_player_config_field(
+            manager, player_id, "day_display_brightness", value
+        ),
     ),
     YotoNumberEntityDescription(
         key="night_display_brightness",
@@ -87,8 +108,21 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         native_step=1,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda player: _brightness_value(player, "night_display_brightness"),
-        config_field="night_display_brightness",
-        convert_fn=int,
+        set_fn=lambda manager, player_id, value: _set_player_config_field(
+            manager, player_id, "night_display_brightness", value
+        ),
+    ),
+    YotoNumberEntityDescription(
+        key="sleep_timer",
+        translation_key="sleep_timer",
+        native_min_value=0,
+        native_max_value=46500,
+        native_step=1,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda player: float(player.sleep_timer_seconds_remaining)
+        if player.sleep_timer_seconds_remaining is not None
+        else None,
+        set_fn=_set_sleep_timer,
     ),
 )
 
@@ -129,14 +163,9 @@ class YotoNumberEntity(YotoEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the number value."""
-        config = YotoPlayerConfig()
-        setattr(
-            config,
-            self.entity_description.config_field,
-            self.entity_description.convert_fn(value),
-        )
         await self.hass.async_add_executor_job(
-            self.coordinator.manager.set_player_config,
+            self.entity_description.set_fn,
+            self.coordinator.manager,
             self._player_id,
-            config,
+            value,
         )

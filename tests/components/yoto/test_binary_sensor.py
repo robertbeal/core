@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+import pytest
 from yoto_api import YotoPlayer
 
 from homeassistant.components.binary_sensor import (
@@ -10,6 +11,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.const import ATTR_DEVICE_CLASS, STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from tests.common import MockConfigEntry
 
@@ -87,12 +89,13 @@ async def test_charging_binary_sensor(
     )
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_bluetooth_connected_binary_sensor(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Bluetooth binary sensor should reflect connection state."""
+    """Bluetooth binary sensor should reflect connection state when enabled."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -136,3 +139,108 @@ async def test_binary_sensor_none_is_unknown(
     state = hass.states.get("binary_sensor.my_yoto_charging")
     assert state is not None
     assert state.state == "unknown"
+
+
+async def test_day_mode_on_binary_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Day mode binary sensor should reflect whether day mode is active."""
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager, day_mode_on=True)
+
+    state = hass.states.get("binary_sensor.my_yoto_day_mode")
+    assert state is not None
+    assert state.state == STATE_ON
+
+
+async def test_day_mode_off_binary_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Day mode binary sensor should be off during night mode."""
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager, day_mode_on=False)
+
+    state = hass.states.get("binary_sensor.my_yoto_day_mode")
+    assert state is not None
+    assert state.state == STATE_OFF
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_audio_device_connected_binary_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Audio device connected binary sensor should reflect state when enabled."""
+    await _setup_player(
+        hass, mock_config_entry, mock_yoto_manager, audio_device_connected=True
+    )
+
+    state = hass.states.get("binary_sensor.my_yoto_audio_device_connected")
+    assert state is not None
+    assert state.state == STATE_ON
+    assert (
+        state.attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.CONNECTIVITY
+    )
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_night_light_mode_binary_sensor_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Night light mode should be on when not 'off' (when enabled)."""
+    await _setup_player(
+        hass, mock_config_entry, mock_yoto_manager, night_light_mode="0xff0000"
+    )
+
+    state = hass.states.get("binary_sensor.my_yoto_night_light_mode")
+    assert state is not None
+    assert state.state == STATE_ON
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_night_light_mode_binary_sensor_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Night light mode should be off when value is 'off' (when enabled)."""
+    await _setup_player(
+        hass, mock_config_entry, mock_yoto_manager, night_light_mode="off"
+    )
+
+    state = hass.states.get("binary_sensor.my_yoto_night_light_mode")
+    assert state is not None
+    assert state.state == STATE_OFF
+
+
+async def test_niche_binary_sensors_disabled_by_default(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Niche binary sensors should be disabled by default in the entity registry."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        bluetooth_audio_connected=True,
+        audio_device_connected=True,
+        night_light_mode="0xff0000",
+    )
+
+    for entity_id in (
+        "binary_sensor.my_yoto_bluetooth_audio_connected",
+        "binary_sensor.my_yoto_audio_device_connected",
+        "binary_sensor.my_yoto_night_light_mode",
+    ):
+        entry = entity_registry.async_get(entity_id)
+        assert entry is not None, f"{entity_id} not found in registry"
+        assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION, (
+            f"{entity_id} should be disabled by default"
+        )

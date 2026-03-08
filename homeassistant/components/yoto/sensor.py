@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    LIGHT_LUX,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
@@ -25,6 +26,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from . import YotoConfigEntry
 from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
+
+PARALLEL_UPDATES = 0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -65,6 +68,33 @@ SENSORS: tuple[YotoSensorEntityDescription, ...] = (
         translation_key="firmware_version",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda player: player.firmware_version,
+    ),
+    YotoSensorEntityDescription(
+        key="last_updated_at",
+        translation_key="last_updated_at",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda player: player.last_updated_at,
+    ),
+    YotoSensorEntityDescription(
+        key="ambient_light",
+        translation_key="ambient_light",
+        device_class=SensorDeviceClass.ILLUMINANCE,
+        native_unit_of_measurement=LIGHT_LUX,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        value_fn=lambda player: player.ambient_light_sensor_reading,
+    ),
+    YotoSensorEntityDescription(
+        key="battery_temperature",
+        translation_key="battery_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda player: player.battery_temperature,
     ),
 )
 

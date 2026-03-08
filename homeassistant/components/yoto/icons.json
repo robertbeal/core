@@ -1,0 +1,109 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "online": {
+        "default": "mdi:access-point"
+      },
+      "charging": {
+        "default": "mdi:battery-charging"
+      },
+      "bluetooth_audio_connected": {
+        "default": "mdi:bluetooth-audio",
+        "state": {
+          "off": "mdi:bluetooth-off"
+        }
+      },
+      "sleep_timer": {
+        "default": "mdi:timer-sand",
+        "state": {
+          "off": "mdi:timer-sand-empty"
+        }
+      },
+      "day_mode": {
+        "default": "mdi:weather-sunny",
+        "state": {
+          "off": "mdi:weather-night"
+        }
+      },
+      "audio_device_connected": {
+        "default": "mdi:headphones",
+        "state": {
+          "off": "mdi:headphones-off"
+        }
+      },
+      "night_light_mode": {
+        "default": "mdi:lightbulb-night"
+      }
+    },
+    "light": {
+      "day_ambient_colour": {
+        "default": "mdi:palette"
+      },
+      "night_ambient_colour": {
+        "default": "mdi:palette"
+      }
+    },
+    "number": {
+      "day_max_volume_limit": {
+        "default": "mdi:volume-high"
+      },
+      "night_max_volume_limit": {
+        "default": "mdi:volume-medium"
+      },
+      "day_display_brightness": {
+        "default": "mdi:brightness-6"
+      },
+      "night_display_brightness": {
+        "default": "mdi:brightness-4"
+      },
+      "sleep_timer": {
+        "default": "mdi:timer-sand"
+      }
+    },
+    "sensor": {
+      "battery": {
+        "default": "mdi:battery"
+      },
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "wifi_signal_strength": {
+        "default": "mdi:wifi"
+      },
+      "firmware_version": {
+        "default": "mdi:information-outline"
+      },
+      "last_updated_at": {
+        "default": "mdi:clock-outline"
+      },
+      "ambient_light": {
+        "default": "mdi:brightness-5"
+      },
+      "battery_temperature": {
+        "default": "mdi:thermometer"
+      }
+    },
+    "switch": {
+      "day_auto_brightness": {
+        "default": "mdi:brightness-auto"
+      },
+      "night_auto_brightness": {
+        "default": "mdi:brightness-auto"
+      },
+      "end_of_track_sleep": {
+        "default": "mdi:sleep",
+        "state": {
+          "off": "mdi:sleep-off"
+        }
+      }
+    },
+    "time": {
+      "day_mode_time": {
+        "default": "mdi:weather-sunny-alert"
+      },
+      "night_mode_time": {
+        "default": "mdi:weather-night"
+      }
+    }
+  }
+}

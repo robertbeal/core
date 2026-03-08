@@ -155,3 +155,39 @@ async def test_number_entities_are_config_category(
     entry = ent_reg.async_get("number.my_yoto_day_max_volume_limit")
     assert entry is not None
     assert entry.entity_category == EntityCategory.CONFIG
+
+
+async def test_sleep_timer_seconds_remaining(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Sleep timer should report the remaining seconds."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        sleep_timer_seconds_remaining=120,
+    )
+
+    state = hass.states.get("number.my_yoto_sleep_timer")
+    assert state is not None
+    assert state.state == "120.0"
+
+
+async def test_set_sleep_timer(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Setting sleep timer should call set_sleep on the manager."""
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        SERVICE_SET_VALUE,
+        {ATTR_ENTITY_ID: "number.my_yoto_sleep_timer", ATTR_VALUE: 300},
+        blocking=True,
+    )
+
+    mock_yoto_manager.set_sleep.assert_called_once_with(PLAYER_ID, 300)
