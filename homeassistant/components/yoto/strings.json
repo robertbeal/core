@@ -34,6 +34,28 @@
         "name": "Sleep timer"
       }
     },
+    "light": {
+      "day_ambient_colour": {
+        "name": "Day ambient colour"
+      },
+      "night_ambient_colour": {
+        "name": "Night ambient colour"
+      }
+    },
+    "number": {
+      "day_max_volume_limit": {
+        "name": "Day max volume limit"
+      },
+      "night_max_volume_limit": {
+        "name": "Night max volume limit"
+      },
+      "day_display_brightness": {
+        "name": "Day display brightness"
+      },
+      "night_display_brightness": {
+        "name": "Night display brightness"
+      }
+    },
     "sensor": {
       "battery": {
         "name": "Battery"
@@ -46,6 +68,22 @@
       },
       "firmware_version": {
         "name": "Firmware version"
+      }
+    },
+    "switch": {
+      "day_auto_brightness": {
+        "name": "Day auto brightness"
+      },
+      "night_auto_brightness": {
+        "name": "Night auto brightness"
+      }
+    },
+    "time": {
+      "day_mode_time": {
+        "name": "Day mode time"
+      },
+      "night_mode_time": {
+        "name": "Night mode time"
       }
     }
   },
