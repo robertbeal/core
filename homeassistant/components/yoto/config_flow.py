@@ -7,12 +7,19 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
+import voluptuous as vol
 from yoto_api import YotoManager
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_TOKEN
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlowWithReload,
+)
+from homeassistant.const import CONF_SCAN_INTERVAL, CONF_TOKEN
+from homeassistant.core import callback
 
-from .const import CLIENT_ID, DOMAIN
+from .const import CLIENT_ID, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,6 +30,14 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
     _manager: YotoManager
     _auth_data: dict[str, Any]
     _login_task: asyncio.Task[None] | None = None
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> YotoOptionsFlowHandler:
+        """Get the options flow for this handler."""
+        return YotoOptionsFlowHandler()
 
     async def _async_wait_for_auth(self) -> None:
         """Wait for device code auth to complete (runs in background task)."""
@@ -134,3 +149,26 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle re-authentication failure."""
         return self.async_abort(reason="invalid_auth")
+
+
+class YotoOptionsFlowHandler(OptionsFlowWithReload):
+    """Handle Yoto options flow."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle options flow."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_SCAN_INTERVAL,
+                    default=self.config_entry.options.get(
+                        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                    ),
+                ): vol.All(int, vol.Range(min=1, max=60)),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=data_schema)

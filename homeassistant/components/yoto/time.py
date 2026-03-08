@@ -10,7 +10,7 @@ from yoto_api import YotoPlayer, YotoPlayerConfig
 
 from homeassistant.components.time import TimeEntity, TimeEntityDescription
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import YotoConfigEntry
@@ -56,11 +56,23 @@ async def async_setup_entry(
     """Set up Yoto time entities from a config entry."""
     coordinator = entry.runtime_data.coordinator
 
-    async_add_entities(
-        YotoTimeEntity(coordinator, player_id, description)
-        for player_id in coordinator.data
-        for description in TIMES
-    )
+    known_players: set[str] = set()
+
+    @callback
+    def _async_add_new_players() -> None:
+        """Add time entities for any newly discovered players."""
+        current_players = set(coordinator.data)
+        new_players = current_players - known_players
+        if new_players:
+            known_players.update(new_players)
+            async_add_entities(
+                YotoTimeEntity(coordinator, player_id, description)
+                for player_id in new_players
+                for description in TIMES
+            )
+
+    _async_add_new_players()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_players))
 
 
 class YotoTimeEntity(YotoEntity, TimeEntity):

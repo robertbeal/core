@@ -1,8 +1,10 @@
 """Tests for the Yoto switch platform."""
 
+import datetime
 from unittest.mock import MagicMock
 
 from yoto_api import YotoPlayer, YotoPlayerConfig
+from yoto_api.YotoPlayer import Alarm
 
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
 from homeassistant.const import (
@@ -220,3 +222,185 @@ async def test_end_of_track_sleep_turn_off(
     )
 
     mock_yoto_manager.set_sleep.assert_called_once_with(PLAYER_ID, 0)
+
+
+async def test_alarm_enabled_switch(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Alarm switch should show enabled state."""
+    alarm = Alarm(
+        enabled=True,
+        time=datetime.time(7, 0),
+        volume=8,
+        sound_id="4OD25",
+        days_enabled=127,
+    )
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        config=YotoPlayerConfig(
+            day_display_brightness="auto",
+            night_display_brightness="60",
+            alarms=[alarm],
+        ),
+    )
+
+    state = hass.states.get("switch.my_yoto_alarm_1")
+    assert state is not None
+    assert state.state == "on"
+
+
+async def test_alarm_disabled_switch(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Alarm switch should show disabled state."""
+    alarm = Alarm(enabled=False, time=datetime.time(7, 0))
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        config=YotoPlayerConfig(
+            day_display_brightness="auto",
+            night_display_brightness="60",
+            alarms=[alarm],
+        ),
+    )
+
+    state = hass.states.get("switch.my_yoto_alarm_1")
+    assert state is not None
+    assert state.state == "off"
+
+
+async def test_multiple_alarm_switches(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Multiple alarms should create numbered switch entities."""
+    alarms = [
+        Alarm(enabled=True, time=datetime.time(7, 0)),
+        Alarm(enabled=False, time=datetime.time(8, 30)),
+    ]
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        config=YotoPlayerConfig(
+            day_display_brightness="auto",
+            night_display_brightness="60",
+            alarms=alarms,
+        ),
+    )
+
+    state1 = hass.states.get("switch.my_yoto_alarm_1")
+    assert state1 is not None
+    assert state1.state == "on"
+
+    state2 = hass.states.get("switch.my_yoto_alarm_2")
+    assert state2 is not None
+    assert state2.state == "off"
+
+
+async def test_alarm_turn_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Turning on an alarm switch should enable the alarm via the API."""
+    alarm = Alarm(enabled=False, time=datetime.time(7, 0))
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        config=YotoPlayerConfig(
+            day_display_brightness="auto",
+            night_display_brightness="60",
+            alarms=[alarm],
+        ),
+    )
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: "switch.my_yoto_alarm_1"},
+        blocking=True,
+    )
+
+    mock_yoto_manager.set_player_config.assert_called_once()
+    call_args = mock_yoto_manager.set_player_config.call_args
+    assert call_args[0][0] == PLAYER_ID
+    config = call_args[0][1]
+    assert config.alarms[0].enabled is True
+
+
+async def test_alarm_turn_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Turning off an alarm switch should disable the alarm via the API."""
+    alarm = Alarm(enabled=True, time=datetime.time(7, 0))
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        config=YotoPlayerConfig(
+            day_display_brightness="auto",
+            night_display_brightness="60",
+            alarms=[alarm],
+        ),
+    )
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_OFF,
+        {ATTR_ENTITY_ID: "switch.my_yoto_alarm_1"},
+        blocking=True,
+    )
+
+    mock_yoto_manager.set_player_config.assert_called_once()
+    call_args = mock_yoto_manager.set_player_config.call_args
+    assert call_args[0][0] == PLAYER_ID
+    config = call_args[0][1]
+    assert config.alarms[0].enabled is False
+
+
+async def test_no_alarm_switches_when_no_alarms(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """No alarm switch entities should be created when config has no alarms."""
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    state = hass.states.get("switch.my_yoto_alarm_1")
+    assert state is None
+
+
+async def test_alarm_switch_is_config_category(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Alarm switches should be in the config entity category."""
+    alarm = Alarm(enabled=True, time=datetime.time(7, 0))
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        config=YotoPlayerConfig(
+            day_display_brightness="auto",
+            night_display_brightness="60",
+            alarms=[alarm],
+        ),
+    )
+
+    ent_reg = er.async_get(hass)
+    entry = ent_reg.async_get("switch.my_yoto_alarm_1")
+    assert entry is not None
+    assert entry.entity_category == EntityCategory.CONFIG

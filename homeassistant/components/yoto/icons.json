@@ -95,6 +95,12 @@
         "state": {
           "off": "mdi:sleep-off"
         }
+      },
+      "alarm": {
+        "default": "mdi:alarm",
+        "state": {
+          "off": "mdi:alarm-off"
+        }
       }
     },
     "time": {

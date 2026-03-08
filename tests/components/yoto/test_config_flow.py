@@ -159,3 +159,39 @@ async def test_reauth_flow_auth_failure(
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "invalid_auth"
+
+
+async def test_options_flow_default_scan_interval(
+    hass: HomeAssistant,
+    mock_yoto_manager: MagicMock,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test that options flow shows the default scan interval."""
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+
+async def test_options_flow_sets_scan_interval(
+    hass: HomeAssistant,
+    mock_yoto_manager: MagicMock,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test that options flow saves the scan interval."""
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={"scan_interval": 10},
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert mock_config_entry.options == {"scan_interval": 10}

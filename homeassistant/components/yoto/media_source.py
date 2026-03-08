@@ -1,0 +1,163 @@
+"""Media source platform for the Yoto integration.
+
+Provides Yoto card library as a media source so audio can be played
+on any media player in Home Assistant (e.g. Sonos, Google Home).
+
+IMPORTANT: Yoto track URLs are signed S3/CloudFront URLs that expire
+after approximately one hour. We must always re-fetch card details via
+update_card_detail before resolving a track URL — never use cached URLs.
+"""
+
+from __future__ import annotations
+
+import logging
+
+from homeassistant.components.media_player import MediaClass, MediaType
+from homeassistant.components.media_source import (
+    BrowseMediaSource,
+    MediaSource,
+    MediaSourceItem,
+    PlayMedia,
+    Unresolvable,
+)
+from homeassistant.core import HomeAssistant
+
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+MIME_TYPES: dict[str, str] = {
+    "aac": "audio/aac",
+    "mp3": "audio/mpeg",
+    "opus": "audio/opus",
+}
+
+
+async def async_get_media_source(hass: HomeAssistant) -> YotoMediaSource:
+    """Set up the Yoto media source."""
+    return YotoMediaSource(hass)
+
+
+class YotoMediaSource(MediaSource):
+    """Provide Yoto card library as a media source."""
+
+    name = "Yoto"
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialise the media source."""
+        super().__init__(DOMAIN)
+        self.hass = hass
+
+    @property
+    def _coordinator(self):
+        """Return the coordinator from the first config entry."""
+        entry = self.hass.config_entries.async_loaded_entries(DOMAIN)[0]
+        return entry.runtime_data.coordinator
+
+    async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
+        """Resolve a media item to a playable URL.
+
+        Always re-fetches card details to obtain fresh signed URLs,
+        since Yoto streams use time-limited S3/CloudFront URLs.
+        """
+        card_id, chapter_key, track_key = _parse_identifier(item.identifier)
+        coordinator = self._coordinator
+        manager = coordinator.manager
+
+        # Always re-fetch to get fresh signed URLs
+        await self.hass.async_add_executor_job(manager.update_card_detail, card_id)
+
+        card = manager.library.get(card_id)
+        if card is None:
+            raise Unresolvable(f"Card {card_id} not found in library")
+
+        if chapter_key is None:
+            chapter_key = next(iter(card.chapters), None)
+        if chapter_key is None or chapter_key not in card.chapters:
+            raise Unresolvable(f"No chapters found for card {card_id}")
+
+        chapter = card.chapters[chapter_key]
+
+        if track_key is None:
+            track_key = next(iter(chapter.tracks), None)
+        if track_key is None or track_key not in chapter.tracks:
+            raise Unresolvable(f"No tracks found for chapter {chapter_key}")
+
+        track = chapter.tracks[track_key]
+        mime_type = MIME_TYPES.get(track.format, "audio/aac")
+
+        return PlayMedia(track.trackUrl, mime_type)
+
+    async def async_browse_media(self, item: MediaSourceItem) -> BrowseMediaSource:
+        """Browse the Yoto card library."""
+        coordinator = self._coordinator
+        manager = coordinator.manager
+
+        if item.identifier:
+            card_id = item.identifier
+            card = manager.library.get(card_id)
+            if card is None:
+                raise Unresolvable(f"Card {card_id} not found in library")
+
+            if not card.chapters:
+                await self.hass.async_add_executor_job(
+                    manager.update_card_detail, card_id
+                )
+
+            return BrowseMediaSource(
+                domain=DOMAIN,
+                identifier=card_id,
+                media_class=MediaClass.MUSIC,
+                media_content_type=MediaType.MUSIC,
+                title=card.title,
+                can_play=True,
+                can_expand=False,
+                children=[
+                    BrowseMediaSource(
+                        domain=DOMAIN,
+                        identifier=f"{card_id}+{chapter.key}",
+                        media_class=MediaClass.MUSIC,
+                        media_content_type=MediaType.MUSIC,
+                        title=chapter.title,
+                        can_play=True,
+                        can_expand=False,
+                        thumbnail=chapter.icon,
+                    )
+                    for chapter in card.chapters.values()
+                ],
+                children_media_class=MediaClass.MUSIC,
+            )
+
+        # Root: show all cards
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=None,
+            media_class=MediaClass.DIRECTORY,
+            media_content_type=MediaType.MUSIC,
+            title="Yoto Library",
+            can_play=False,
+            can_expand=True,
+            children=[
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=card.id,
+                    media_class=MediaClass.MUSIC,
+                    media_content_type=MediaType.MUSIC,
+                    title=card.title,
+                    can_play=True,
+                    can_expand=True,
+                    thumbnail=card.cover_image_large,
+                )
+                for card in manager.library.values()
+            ],
+            children_media_class=MediaClass.MUSIC,
+        )
+
+
+def _parse_identifier(identifier: str) -> tuple[str, str | None, str | None]:
+    """Parse a media source identifier into card_id, chapter_key, track_key."""
+    parts = identifier.split("+")
+    card_id = parts[0]
+    chapter_key = parts[1] if len(parts) >= 2 else None
+    track_key = parts[2] if len(parts) >= 3 else None
+    return card_id, chapter_key, track_key

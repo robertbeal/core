@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 
 from yoto_api import AuthenticationError, YotoManager, YotoPlayer
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_TOKEN
+from homeassistant.const import CONF_SCAN_INTERVAL, CONF_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, SCAN_INTERVAL
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,12 +30,15 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         manager: YotoManager,
     ) -> None:
         """Initialise the coordinator."""
+        scan_minutes = config_entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        )
         super().__init__(
             hass,
             _LOGGER,
             config_entry=config_entry,
             name=DOMAIN,
-            update_interval=SCAN_INTERVAL,
+            update_interval=timedelta(minutes=scan_minutes),
         )
         self.manager = manager
 

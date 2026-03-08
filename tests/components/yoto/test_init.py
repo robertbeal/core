@@ -68,3 +68,42 @@ async def test_remove_config_entry_device(
         hass, mock_config_entry, device_entry
     )
     assert result is True
+
+
+async def test_new_player_creates_entities_dynamically(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """A new player appearing in coordinator data should create entities automatically."""
+    player_1 = _make_player()
+    mock_yoto_manager.players = {PLAYER_ID: player_1}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Player 1 entities exist
+    assert hass.states.get("sensor.my_yoto_battery") is not None
+
+    # Player 2 does not exist yet
+    assert hass.states.get("sensor.second_player_battery") is None
+
+    # Simulate a new player appearing after a coordinator poll
+    player_2 = YotoPlayer(
+        id="player-2",
+        name="Second Player",
+        device_type="v3",
+        online=True,
+        firmware_version="2.0.0",
+        battery_level_percentage=50,
+    )
+    mock_yoto_manager.players["player-2"] = player_2
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    coordinator.async_set_updated_data(mock_yoto_manager.players)
+    await hass.async_block_till_done()
+
+    # Player 2 entities should now exist
+    state = hass.states.get("sensor.second_player_battery")
+    assert state is not None
+    assert state.state == "50"

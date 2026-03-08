@@ -1,0 +1,19 @@
+# serializer version: 1
+# name: test_diagnostics
+  dict({
+    'players': dict({
+      'player-123': dict({
+        'battery_level_percentage': 85,
+        'device_type': 'v3',
+        'firmware_version': '5.0.0',
+        'id': '**REDACTED**',
+        'is_playing': True,
+        'last_updated_at': '2025-01-01T12:00:00',
+        'name': 'Living Room',
+        'online': True,
+        'temperature_celcius': 22.5,
+        'wifi_strength': -45,
+      }),
+    }),
+  })
+# ---

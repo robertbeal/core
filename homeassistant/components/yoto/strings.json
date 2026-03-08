@@ -19,6 +19,18 @@
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Polling interval (minutes)"
+        },
+        "data_description": {
+          "scan_interval": "How often to poll the Yoto API for player updates (1-60 minutes)."
+        }
+      }
+    }
+  },
   "entity": {
     "binary_sensor": {
       "online": {
@@ -100,6 +112,9 @@
       },
       "end_of_track_sleep": {
         "name": "End of track sleep"
+      },
+      "alarm": {
+        "name": "Alarm {number}"
       }
     },
     "time": {
