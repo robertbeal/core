@@ -1,0 +1,12 @@
+{
+  "domain": "yoto",
+  "name": "Yoto",
+  "codeowners": ["@robertbeal"],
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/yoto",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "quality_scale": "bronze",
+  "requirements": ["yoto-api==2.2.4"],
+  "single_config_entry": true
+}

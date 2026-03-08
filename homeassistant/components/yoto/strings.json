@@ -1,0 +1,60 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Yoto",
+        "description": "To authenticate, visit {url} and enter the code: **{code}**"
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate with Yoto",
+        "description": "To re-authenticate, visit {url} and enter the code: **{code}**"
+      }
+    },
+    "progress": {
+      "wait_for_auth": "Waiting for authentication. Please visit the link and enter the code shown above."
+    },
+    "abort": {
+      "invalid_auth": "Authentication failed. Please try again.",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
+      "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]"
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      },
+      "charging": {
+        "name": "Charging"
+      },
+      "bluetooth_audio_connected": {
+        "name": "Bluetooth audio connected"
+      },
+      "sleep_timer": {
+        "name": "Sleep timer"
+      }
+    },
+    "sensor": {
+      "battery": {
+        "name": "Battery"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "wifi_signal_strength": {
+        "name": "WiFi signal strength"
+      },
+      "firmware_version": {
+        "name": "Firmware version"
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "Authentication failed. Please re-authenticate."
+    },
+    "api_failed": {
+      "message": "Failed to connect to the Yoto API."
+    }
+  }
+}
