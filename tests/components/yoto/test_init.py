@@ -61,9 +61,7 @@ async def test_remove_config_entry_device(
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device_entry = device_registry.async_get_device(
-        identifiers={("yoto", PLAYER_ID)}
-    )
+    device_entry = device_registry.async_get_device(identifiers={("yoto", PLAYER_ID)})
     assert device_entry is not None
 
     result = await async_remove_config_entry_device(

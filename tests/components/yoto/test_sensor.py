@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from yoto_api import YotoPlayer
 
-from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN, SensorDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import (
     ATTR_DEVICE_CLASS,
     ATTR_UNIT_OF_MEASUREMENT,
@@ -43,9 +43,7 @@ async def _setup_player(
     **player_overrides: object,
 ) -> None:
     """Set up hass with a single player entity."""
-    mock_yoto_manager.players = {
-        PLAYER_ID: _make_player(**player_overrides)
-    }
+    mock_yoto_manager.players = {PLAYER_ID: _make_player(**player_overrides)}
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -82,9 +80,7 @@ async def test_temperature_sensor(
     assert state is not None
     assert state.state == "22"
     assert state.attributes[ATTR_DEVICE_CLASS] == SensorDeviceClass.TEMPERATURE
-    assert (
-        state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfTemperature.CELSIUS
-    )
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfTemperature.CELSIUS
 
 
 async def test_wifi_strength_sensor(
@@ -93,17 +89,14 @@ async def test_wifi_strength_sensor(
     mock_yoto_manager: MagicMock,
 ) -> None:
     """WiFi strength sensor should expose wifi_strength as dBm."""
-    await _setup_player(
-        hass, mock_config_entry, mock_yoto_manager, wifi_strength=-61
-    )
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager, wifi_strength=-61)
 
     state = hass.states.get("sensor.my_yoto_wifi_signal_strength")
     assert state is not None
     assert state.state == "-61"
     assert state.attributes[ATTR_DEVICE_CLASS] == SensorDeviceClass.SIGNAL_STRENGTH
     assert (
-        state.attributes[ATTR_UNIT_OF_MEASUREMENT]
-        == SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+        state.attributes[ATTR_UNIT_OF_MEASUREMENT] == SIGNAL_STRENGTH_DECIBELS_MILLIWATT
     )
 
 

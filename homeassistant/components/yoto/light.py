@@ -36,17 +36,17 @@ LIGHTS: tuple[YotoLightEntityDescription, ...] = (
     YotoLightEntityDescription(
         key="day_ambient_colour",
         translation_key="day_ambient_colour",
-        value_fn=lambda player: player.config.day_ambient_colour
-        if player.config
-        else None,
+        value_fn=lambda player: (
+            player.config.day_ambient_colour if player.config else None
+        ),
         config_field="day_ambient_colour",
     ),
     YotoLightEntityDescription(
         key="night_ambient_colour",
         translation_key="night_ambient_colour",
-        value_fn=lambda player: player.config.night_ambient_colour
-        if player.config
-        else None,
+        value_fn=lambda player: (
+            player.config.night_ambient_colour if player.config else None
+        ),
         config_field="night_ambient_colour",
     ),
 )
@@ -64,7 +64,7 @@ def _hex_to_rgb(hex_colour: str) -> tuple[int, int, int]:
 
 def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
     """Convert an (R, G, B) tuple to a hex colour string like '#ff0000'."""
-    return "#%02x%02x%02x" % rgb
+    return f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
 
 
 async def async_setup_entry(

@@ -20,7 +20,9 @@ from .entity import YotoEntity, YotoEntityDescription
 PARALLEL_UPDATES = 1
 
 
-def _set_brightness(manager: YotoManager, player_id: str, field: str, value: str) -> None:
+def _set_brightness(
+    manager: YotoManager, player_id: str, field: str, value: str
+) -> None:
     """Set a display brightness field via the API."""
     config = YotoPlayerConfig()
     setattr(config, field, value)
@@ -29,7 +31,11 @@ def _set_brightness(manager: YotoManager, player_id: str, field: str, value: str
 
 def _end_of_track_is_on(player: YotoPlayer) -> bool:
     """Return True when the sleep timer approximately matches the remaining track time."""
-    if player.track_length is None or player.track_position is None:
+    if (
+        player.track_length is None
+        or player.track_position is None
+        or player.sleep_timer_seconds_remaining is None
+    ):
         return False
     seconds_to_end = player.track_length - player.track_position
     return abs(player.sleep_timer_seconds_remaining - seconds_to_end) <= 5
@@ -61,9 +67,11 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
         key="day_auto_brightness",
         translation_key="day_auto_brightness",
         entity_category=EntityCategory.CONFIG,
-        is_on_fn=lambda player: player.config.day_display_brightness == "auto"
-        if player.config and player.config.day_display_brightness is not None
-        else None,
+        is_on_fn=lambda player: (
+            player.config.day_display_brightness == "auto"
+            if player.config and player.config.day_display_brightness is not None
+            else None
+        ),
         turn_on_fn=lambda manager, player: _set_brightness(
             manager, player.id, "day_display_brightness", "auto"
         ),
@@ -75,9 +83,11 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
         key="night_auto_brightness",
         translation_key="night_auto_brightness",
         entity_category=EntityCategory.CONFIG,
-        is_on_fn=lambda player: player.config.night_display_brightness == "auto"
-        if player.config and player.config.night_display_brightness is not None
-        else None,
+        is_on_fn=lambda player: (
+            player.config.night_display_brightness == "auto"
+            if player.config and player.config.night_display_brightness is not None
+            else None
+        ),
         turn_on_fn=lambda manager, player: _set_brightness(
             manager, player.id, "night_display_brightness", "auto"
         ),

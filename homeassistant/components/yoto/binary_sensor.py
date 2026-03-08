@@ -75,9 +75,11 @@ BINARY_SENSORS: tuple[YotoBinarySensorEntityDescription, ...] = (
         key="night_light_mode",
         translation_key="night_light_mode",
         entity_registry_enabled_default=False,
-        value_fn=lambda player: player.night_light_mode != "off"
-        if player.night_light_mode is not None
-        else None,
+        value_fn=lambda player: (
+            player.night_light_mode != "off"
+            if player.night_light_mode is not None
+            else None
+        ),
     ),
 )
 

@@ -5,10 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from yoto_api import YotoPlayer
 
-from homeassistant.components.binary_sensor import (
-    DOMAIN as BINARY_SENSOR_DOMAIN,
-    BinarySensorDeviceClass,
-)
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.const import ATTR_DEVICE_CLASS, STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -37,9 +34,7 @@ async def _setup_player(
     **player_overrides: object,
 ) -> None:
     """Set up hass with a single player entity."""
-    mock_yoto_manager.players = {
-        PLAYER_ID: _make_player(**player_overrides)
-    }
+    mock_yoto_manager.players = {PLAYER_ID: _make_player(**player_overrides)}
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -84,8 +79,7 @@ async def test_charging_binary_sensor(
     assert state is not None
     assert state.state == STATE_ON
     assert (
-        state.attributes[ATTR_DEVICE_CLASS]
-        == BinarySensorDeviceClass.BATTERY_CHARGING
+        state.attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.BATTERY_CHARGING
     )
 
 
@@ -106,9 +100,7 @@ async def test_bluetooth_connected_binary_sensor(
     state = hass.states.get("binary_sensor.my_yoto_bluetooth_audio_connected")
     assert state is not None
     assert state.state == STATE_ON
-    assert (
-        state.attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.CONNECTIVITY
-    )
+    assert state.attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.CONNECTIVITY
 
 
 async def test_sleep_timer_binary_sensor(
@@ -132,9 +124,7 @@ async def test_binary_sensor_none_is_unknown(
     mock_yoto_manager: MagicMock,
 ) -> None:
     """Binary sensor should report unknown when the underlying value is None."""
-    await _setup_player(
-        hass, mock_config_entry, mock_yoto_manager, charging=None
-    )
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager, charging=None)
 
     state = hass.states.get("binary_sensor.my_yoto_charging")
     assert state is not None
@@ -181,9 +171,7 @@ async def test_audio_device_connected_binary_sensor(
     state = hass.states.get("binary_sensor.my_yoto_audio_device_connected")
     assert state is not None
     assert state.state == STATE_ON
-    assert (
-        state.attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.CONNECTIVITY
-    )
+    assert state.attributes[ATTR_DEVICE_CLASS] == BinarySensorDeviceClass.CONNECTIVITY
 
 
 @pytest.mark.usefixtures("entity_registry_enabled_by_default")

@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 from tests.common import MockConfigEntry
 
 PLAYER_ID = "player-1"
-ENTITY_ID = f"media_player.my_yoto"
+ENTITY_ID = "media_player.my_yoto"
 
 
 def _make_player(**overrides: object) -> YotoPlayer:
@@ -52,9 +52,7 @@ async def test_media_player_playing_state(
     mock_yoto_manager: MagicMock,
 ) -> None:
     """Player should reflect playing state."""
-    mock_yoto_manager.players = {
-        PLAYER_ID: _make_player(playback_status="playing")
-    }
+    mock_yoto_manager.players = {PLAYER_ID: _make_player(playback_status="playing")}
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -70,9 +68,7 @@ async def test_media_player_paused_state(
     mock_yoto_manager: MagicMock,
 ) -> None:
     """Player should reflect paused state."""
-    mock_yoto_manager.players = {
-        PLAYER_ID: _make_player(playback_status="paused")
-    }
+    mock_yoto_manager.players = {PLAYER_ID: _make_player(playback_status="paused")}
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -88,9 +84,7 @@ async def test_media_player_off_when_offline(
     mock_yoto_manager: MagicMock,
 ) -> None:
     """Player should be off when offline."""
-    mock_yoto_manager.players = {
-        PLAYER_ID: _make_player(online=False)
-    }
+    mock_yoto_manager.players = {PLAYER_ID: _make_player(online=False)}
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -106,9 +100,7 @@ async def test_media_player_volume(
     mock_yoto_manager: MagicMock,
 ) -> None:
     """Volume should be normalised from 0-16 to 0.0-1.0."""
-    mock_yoto_manager.players = {
-        PLAYER_ID: _make_player(volume=8)
-    }
+    mock_yoto_manager.players = {PLAYER_ID: _make_player(volume=8)}
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)

@@ -40,8 +40,7 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.coordinator
 
     async_add_entities(
-        YotoMediaPlayerEntity(coordinator, player_id)
-        for player_id in coordinator.data
+        YotoMediaPlayerEntity(coordinator, player_id) for player_id in coordinator.data
     )
 
 
@@ -92,9 +91,7 @@ class YotoMediaPlayerEntity(
         if not player.online:
             return MediaPlayerState.OFF
 
-        return PLAYBACK_STATE_MAP.get(
-            player.playback_status, MediaPlayerState.IDLE
-        )
+        return PLAYBACK_STATE_MAP.get(player.playback_status, MediaPlayerState.IDLE)
 
     @property
     def volume_level(self) -> float | None:

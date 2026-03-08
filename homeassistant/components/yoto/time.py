@@ -33,18 +33,16 @@ TIMES: tuple[YotoTimeEntityDescription, ...] = (
         key="day_mode_time",
         translation_key="day_mode_time",
         entity_category=EntityCategory.CONFIG,
-        value_fn=lambda player: player.config.day_mode_time
-        if player.config
-        else None,
+        value_fn=lambda player: player.config.day_mode_time if player.config else None,
         config_field="day_mode_time",
     ),
     YotoTimeEntityDescription(
         key="night_mode_time",
         translation_key="night_mode_time",
         entity_category=EntityCategory.CONFIG,
-        value_fn=lambda player: player.config.night_mode_time
-        if player.config
-        else None,
+        value_fn=lambda player: (
+            player.config.night_mode_time if player.config else None
+        ),
         config_field="night_mode_time",
     ),
 )

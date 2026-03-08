@@ -88,11 +88,11 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
                 translation_key="api_failed", translation_domain=DOMAIN
             ) from err
 
-        self._persist_token_if_changed()
+        self.persist_token_if_changed()
 
         return self.manager.players
 
-    def _persist_token_if_changed(self) -> None:
+    def persist_token_if_changed(self) -> None:
         """Persist the refresh token to the config entry if it has changed."""
         token = self.manager.token.refresh_token
         if token != self.config_entry.data.get(CONF_TOKEN):

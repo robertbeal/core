@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 from yoto_api import YotoManager, YotoPlayer, YotoPlayerConfig
 
-from homeassistant.components.number import (
-    NumberEntity,
-    NumberEntityDescription,
-)
-from homeassistant.const import EntityCategory, PERCENTAGE, UnitOfTime
+from homeassistant.components.number import NumberEntity, NumberEntityDescription
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -32,9 +28,7 @@ def _set_player_config_field(
     manager.set_player_config(player_id, config)
 
 
-def _set_sleep_timer(
-    manager: YotoManager, player_id: str, value: float
-) -> None:
+def _set_sleep_timer(manager: YotoManager, player_id: str, value: float) -> None:
     """Set the sleep timer via the API."""
     manager.set_sleep(player_id, int(value))
 
@@ -65,9 +59,11 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         native_min_value=0,
         native_max_value=16,
         native_step=1,
-        value_fn=lambda player: float(player.config.day_max_volume_limit)
-        if player.config and player.config.day_max_volume_limit is not None
-        else None,
+        value_fn=lambda player: (
+            float(player.config.day_max_volume_limit)
+            if player.config and player.config.day_max_volume_limit is not None
+            else None
+        ),
         set_fn=lambda manager, player_id, value: _set_player_config_field(
             manager, player_id, "day_max_volume_limit", value
         ),
@@ -79,9 +75,11 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         native_min_value=0,
         native_max_value=16,
         native_step=1,
-        value_fn=lambda player: float(player.config.night_max_volume_limit)
-        if player.config and player.config.night_max_volume_limit is not None
-        else None,
+        value_fn=lambda player: (
+            float(player.config.night_max_volume_limit)
+            if player.config and player.config.night_max_volume_limit is not None
+            else None
+        ),
         set_fn=lambda manager, player_id, value: _set_player_config_field(
             manager, player_id, "night_max_volume_limit", value
         ),
@@ -119,9 +117,11 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         native_max_value=46500,
         native_step=1,
         native_unit_of_measurement=UnitOfTime.SECONDS,
-        value_fn=lambda player: float(player.sleep_timer_seconds_remaining)
-        if player.sleep_timer_seconds_remaining is not None
-        else None,
+        value_fn=lambda player: (
+            float(player.sleep_timer_seconds_remaining)
+            if player.sleep_timer_seconds_remaining is not None
+            else None
+        ),
         set_fn=_set_sleep_timer,
     ),
 )

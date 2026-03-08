@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 import logging
 from typing import Any
 
@@ -25,15 +26,11 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _async_wait_for_auth(self) -> None:
         """Wait for device code auth to complete (runs in background task)."""
-        await self.hass.async_add_executor_job(
-            self._manager.device_code_flow_complete
-        )
+        await self.hass.async_add_executor_job(self._manager.device_code_flow_complete)
 
     def _start_login_task(self) -> asyncio.Task[None]:
         """Create and store the login background task."""
-        self._login_task = self.hass.async_create_task(
-            self._async_wait_for_auth()
-        )
+        self._login_task = self.hass.async_create_task(self._async_wait_for_auth())
         return self._login_task
 
     async def async_step_user(
@@ -86,7 +83,7 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_abort(reason="invalid_auth")
 
     async def async_step_reauth(
-        self, entry_data: dict[str, Any]
+        self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
         """Handle re-authentication."""
         return await self.async_step_reauth_confirm()
@@ -107,12 +104,8 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if login_task.done():
             if login_task.exception():
-                return self.async_show_progress_done(
-                    next_step_id="reauth_error"
-                )
-            return self.async_show_progress_done(
-                next_step_id="reauth_finish"
-            )
+                return self.async_show_progress_done(next_step_id="reauth_error")
+            return self.async_show_progress_done(next_step_id="reauth_finish")
 
         return self.async_show_progress(
             step_id="reauth_confirm",

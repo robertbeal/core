@@ -116,7 +116,10 @@ async def test_turn_on_with_rgb(
     await hass.services.async_call(
         LIGHT_DOMAIN,
         SERVICE_TURN_ON,
-        {ATTR_ENTITY_ID: "light.my_yoto_day_ambient_colour", ATTR_RGB_COLOR: (0, 255, 128)},
+        {
+            ATTR_ENTITY_ID: "light.my_yoto_day_ambient_colour",
+            ATTR_RGB_COLOR: (0, 255, 128),
+        },
         blocking=True,
     )
 

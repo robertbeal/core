@@ -66,9 +66,7 @@ async def test_user_flow_auth_failure(
         device_auth_event.wait()
         raise AuthenticationError
 
-    mock_yoto_manager_config_flow.device_code_flow_complete = (
-        mock_complete_with_error
-    )
+    mock_yoto_manager_config_flow.device_code_flow_complete = mock_complete_with_error
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -140,9 +138,7 @@ async def test_reauth_flow_auth_failure(
         device_auth_event.wait()
         raise AuthenticationError
 
-    mock_yoto_manager_config_flow.device_code_flow_complete = (
-        mock_complete_with_error
-    )
+    mock_yoto_manager_config_flow.device_code_flow_complete = mock_complete_with_error
 
     entry = MockConfigEntry(
         domain=DOMAIN,
