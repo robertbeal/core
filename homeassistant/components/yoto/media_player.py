@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 from yoto_api import YotoPlayer
+from yoto_api.Card import Card
 
 from homeassistant.components.media_player import (
+    BrowseMedia,
+    MediaClass,
+    MediaPlayerDeviceClass,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
@@ -51,12 +56,18 @@ class YotoMediaPlayerEntity(
 
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_device_class = MediaPlayerDeviceClass.SPEAKER
+    _attr_volume_step = 1 / YOTO_VOLUME_MAX
     _attr_supported_features = (
         MediaPlayerEntityFeature.PAUSE
         | MediaPlayerEntityFeature.PLAY
         | MediaPlayerEntityFeature.STOP
         | MediaPlayerEntityFeature.VOLUME_SET
         | MediaPlayerEntityFeature.PLAY_MEDIA
+        | MediaPlayerEntityFeature.SEEK
+        | MediaPlayerEntityFeature.NEXT_TRACK
+        | MediaPlayerEntityFeature.PREVIOUS_TRACK
+        | MediaPlayerEntityFeature.BROWSE_MEDIA
     )
 
     def __init__(
@@ -103,8 +114,18 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_title(self) -> str | None:
-        """Return the title of the current track."""
-        return self._player.track_title
+        """Return the title of the current media.
+
+        Combines chapter and track titles when they differ, or shows just
+        the chapter title when they match or the track title is absent.
+        """
+        player = self._player
+        chapter = player.chapter_title
+        track = player.track_title
+
+        if chapter and track and chapter != track:
+            return f"{chapter} - {track}"
+        return chapter or track
 
     @property
     def media_duration(self) -> int | None:
@@ -115,6 +136,58 @@ class YotoMediaPlayerEntity(
     def media_position(self) -> int | None:
         """Return the current playback position in seconds."""
         return self._player.track_position
+
+    @property
+    def _active_card(self) -> Card | None:
+        """Return the library card for the currently playing content."""
+        card_id = self._player.card_id
+        if card_id is None:
+            return None
+        return self.coordinator.manager.library.get(card_id)
+
+    @property
+    def media_image_url(self) -> str | None:
+        """Return the cover image URL of the current card."""
+        card = self._active_card
+        if card is None:
+            return None
+        return card.cover_image_large
+
+    @property
+    def media_image_remotely_accessible(self) -> bool:
+        """Return True since Yoto image URLs are publicly accessible."""
+        return True
+
+    @property
+    def media_artist(self) -> str | None:
+        """Return the author of the current card."""
+        card = self._active_card
+        if card is None:
+            return None
+        return card.author
+
+    @property
+    def media_album_name(self) -> str | None:
+        """Return the title of the current card as the album name."""
+        card = self._active_card
+        if card is None:
+            return None
+        return card.title
+
+    @property
+    def media_content_id(self) -> str | None:
+        """Return the composite content ID of the current media."""
+        player = self._player
+        if player.card_id and player.chapter_key and player.track_key:
+            return f"{player.card_id}+{player.chapter_key}+{player.track_key}"
+        return None
+
+    @property
+    def media_content_type(self) -> MediaType | str | None:
+        """Return the content type of the current media."""
+        if self.media_content_id:
+            return MediaType.MUSIC
+        return None
 
     async def async_media_pause(self) -> None:
         """Pause playback."""
@@ -144,7 +217,137 @@ class YotoMediaPlayerEntity(
     async def async_play_media(
         self, media_type: MediaType | str, media_id: str, **kwargs: Any
     ) -> None:
-        """Play a card on the player."""
+        """Play a card on the player.
+
+        Accepts media IDs in the format: cardid[+chapterKey[+trackKey[+seconds]]].
+        """
+        parts = media_id.split("+")
+        card_id = parts[0]
+        play_kwargs: dict[str, Any] = {}
+        if len(parts) >= 2:
+            play_kwargs["chapterKey"] = parts[1]
+        if len(parts) >= 3:
+            play_kwargs["trackKey"] = parts[2]
+        if len(parts) >= 4:
+            play_kwargs["secondsIn"] = int(parts[3])
+
         await self.hass.async_add_executor_job(
-            self.coordinator.manager.play_card, self._player_id, media_id
+            partial(
+                self.coordinator.manager.play_card,
+                self._player_id,
+                card_id,
+                **play_kwargs,
+            )
+        )
+
+    async def async_media_seek(self, position: float) -> None:
+        """Seek to a position in the current track."""
+        player = self._player
+        await self.hass.async_add_executor_job(
+            partial(
+                self.coordinator.manager.play_card,
+                self._player_id,
+                player.card_id,
+                chapterKey=player.chapter_key,
+                trackKey=player.track_key,
+                secondsIn=int(position),
+            )
+        )
+
+    async def async_media_next_track(self) -> None:
+        """Skip to the next track."""
+        player = self._player
+        chapter_key = str(int(player.chapter_key) + 1) if player.chapter_key else None
+        track_key = str(int(player.track_key) + 1) if player.track_key else None
+        await self.hass.async_add_executor_job(
+            partial(
+                self.coordinator.manager.play_card,
+                self._player_id,
+                player.card_id,
+                chapterKey=chapter_key,
+                trackKey=track_key,
+            )
+        )
+
+    async def async_media_previous_track(self) -> None:
+        """Skip to the previous track."""
+        player = self._player
+        chapter_key = str(int(player.chapter_key) - 1) if player.chapter_key else None
+        track_key = str(int(player.track_key) - 1) if player.track_key else None
+        await self.hass.async_add_executor_job(
+            partial(
+                self.coordinator.manager.play_card,
+                self._player_id,
+                player.card_id,
+                chapterKey=chapter_key,
+                trackKey=track_key,
+            )
+        )
+
+    async def async_browse_media(
+        self,
+        media_content_type: MediaType | str | None = None,
+        media_content_id: str | None = None,
+    ) -> BrowseMedia:
+        """Browse the Yoto card library."""
+        library = self.coordinator.manager.library
+
+        if media_content_id is not None and media_content_id != "library":
+            await self.hass.async_add_executor_job(
+                self.coordinator.manager.update_card_detail, media_content_id
+            )
+            return self._browse_card_chapters(media_content_id, library)
+
+        return BrowseMedia(
+            title="Yoto Library",
+            media_class=MediaClass.DIRECTORY,
+            media_content_id="library",
+            media_content_type=MediaType.MUSIC,
+            can_play=False,
+            can_expand=True,
+            children=[
+                BrowseMedia(
+                    title=card.title,
+                    media_class=MediaClass.MUSIC,
+                    media_content_id=card.id,
+                    media_content_type=MediaType.MUSIC,
+                    can_play=True,
+                    can_expand=True,
+                    thumbnail=card.cover_image_large,
+                )
+                for card in library.values()
+            ],
+            children_media_class=MediaClass.MUSIC,
+        )
+
+    def _browse_card_chapters(
+        self, card_id: str, library: dict[str, Card]
+    ) -> BrowseMedia:
+        """Build a browse response for a card's chapters."""
+        card = library[card_id]
+        children: list[BrowseMedia] = []
+
+        if card.chapters:
+            children = [
+                BrowseMedia(
+                    title=chapter.title,
+                    media_class=MediaClass.MUSIC,
+                    media_content_id=f"{card_id}+{chapter.key}",
+                    media_content_type=MediaType.MUSIC,
+                    can_play=True,
+                    can_expand=False,
+                    thumbnail=chapter.icon,
+                )
+                for chapter in card.chapters.values()
+            ]
+
+        return BrowseMedia(
+            title=card.title,
+            media_class=MediaClass.MUSIC,
+            media_content_id=card_id,
+            media_content_type=MediaType.MUSIC,
+            can_play=True,
+            can_expand=False,
+            children=children,
+            children_media_class=MediaClass.MUSIC,
         )
