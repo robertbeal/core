@@ -58,7 +58,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: YotoConfigEntry) -> boo
     unload = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload:
-        manager: YotoManager = entry.runtime_data.coordinator.manager
-        await hass.async_add_executor_job(manager.disconnect)
+        coordinator = entry.runtime_data.coordinator
+        coordinator._persist_token_if_changed()
+        await hass.async_add_executor_job(coordinator.manager.disconnect)
 
     return unload
