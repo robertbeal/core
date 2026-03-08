@@ -4,6 +4,7 @@ from threading import Thread
 from unittest.mock import MagicMock
 
 from yoto_api import AuthenticationError, YotoPlayer
+from yoto_api.Card import Card, Chapter
 
 from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.config_entries import ConfigEntryState
@@ -235,3 +236,130 @@ async def test_coordinator_disconnects_on_unload(
     await hass.config_entries.async_unload(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     mock_yoto_manager.disconnect.assert_called_once()
+
+
+async def test_coordinator_fetches_library_on_first_poll(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Coordinator should fetch the library when it is empty."""
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    mock_yoto_manager.update_library.assert_called_once()
+
+
+async def test_coordinator_skips_library_when_already_populated(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Coordinator should not re-fetch the library on subsequent polls."""
+    mock_yoto_manager.library = {"card-1": Card(id="card-1", title="Test Card")}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    mock_yoto_manager.update_library.assert_not_called()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    await coordinator.async_refresh()
+
+    mock_yoto_manager.update_library.assert_not_called()
+
+
+async def test_mqtt_callback_fetches_card_detail_for_unknown_card(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """MQTT callback should fetch card details when the active card is not in the library."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Simulate MQTT delivering a playing state with a card that is not in the library
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    mock_yoto_manager.update_card_detail.assert_called_once_with("card-1")
+
+
+async def test_mqtt_callback_fetches_card_detail_when_chapters_missing(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """MQTT callback should fetch card details when the card has no chapters."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+    mock_yoto_manager.library = {"card-1": Card(id="card-1", title="Test Card")}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Simulate MQTT delivering a card that IS in library but has no chapters
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    mock_yoto_manager.update_card_detail.assert_called_once_with("card-1")
+
+
+async def test_mqtt_callback_skips_card_detail_when_chapter_known(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """MQTT callback should not fetch card details when the chapter is already known."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+    mock_yoto_manager.library = {
+        "card-1": Card(
+            id="card-1",
+            title="Test Card",
+            chapters={"ch-01": Chapter(key="ch-01", title="Chapter 1")},
+        )
+    }
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Simulate MQTT delivering a card with a known chapter
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    mock_yoto_manager.update_card_detail.assert_not_called()

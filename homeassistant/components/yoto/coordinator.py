@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import partial
 import logging
 
 from yoto_api import AuthenticationError, YotoManager, YotoPlayer
@@ -52,15 +51,34 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         so we must use call_soon_threadsafe to marshal the update onto
         the event loop.
         """
-        self.hass.loop.call_soon_threadsafe(
-            partial(self.async_set_updated_data, self.manager.players)
-        )
+        self.hass.loop.call_soon_threadsafe(self._process_mqtt_update)
+
+    def _process_mqtt_update(self) -> None:
+        """Process an MQTT update on the event loop."""
+        self._fetch_missing_card_details()
+        self.async_set_updated_data(self.manager.players)
+
+    def _fetch_missing_card_details(self) -> None:
+        """Schedule card detail fetches for cards with missing chapter data."""
+        for player in self.manager.players.values():
+            card_id = player.card_id
+            chapter_key = player.chapter_key
+            if not card_id or not chapter_key:
+                continue
+
+            card = self.manager.library.get(card_id)
+            if card is None or not card.chapters or chapter_key not in card.chapters:
+                self.hass.async_add_executor_job(
+                    self.manager.update_card_detail, card_id
+                )
 
     async def _async_update_data(self) -> dict[str, YotoPlayer]:
         """Fetch player data from the Yoto API."""
         try:
             await self.hass.async_add_executor_job(self.manager.check_and_refresh_token)
             await self.hass.async_add_executor_job(self.manager.update_players_status)
+            if not self.manager.library:
+                await self.hass.async_add_executor_job(self.manager.update_library)
         except AuthenticationError as err:
             raise ConfigEntryAuthFailed(
                 translation_key="auth_failed", translation_domain=DOMAIN
