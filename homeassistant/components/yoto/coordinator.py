@@ -43,12 +43,17 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         )
         self.manager = manager
         self.previous_players: set[str] = set()
+        self._mqtt_connected = False
 
     async def _async_setup(self) -> None:
-        """Connect to MQTT push events."""
-        await self.hass.async_add_executor_job(
-            self.manager.connect_to_events, self._handle_mqtt_event
-        )
+        """Set up the coordinator."""
+
+    def _connect_to_events_if_ready(self) -> None:
+        """Connect to MQTT push events once players are available."""
+        if self._mqtt_connected or not self.manager.players:
+            return
+        self.manager.connect_to_events(self._handle_mqtt_event)
+        self._mqtt_connected = True
 
     def _handle_mqtt_event(self) -> None:
         """Handle an MQTT event."""
@@ -80,6 +85,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             await self.hass.async_add_executor_job(self.manager.update_players_status)
             if not self.manager.library:
                 await self.hass.async_add_executor_job(self.manager.update_library)
+            await self.hass.async_add_executor_job(self._connect_to_events_if_ready)
         except AuthenticationError as err:
             raise ConfigEntryAuthFailed(
                 translation_key="auth_failed", translation_domain=DOMAIN

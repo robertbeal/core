@@ -168,12 +168,28 @@ def _make_player(**overrides: object) -> YotoPlayer:
     return YotoPlayer(**{**defaults, **overrides})
 
 
+async def test_coordinator_defers_mqtt_when_no_players(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator does not connect to MQTT when players dict is empty."""
+    mock_yoto_manager.players = {}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    mock_yoto_manager.connect_to_events.assert_not_called()
+
+
 async def test_coordinator_connects_to_events(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test coordinator connects to MQTT events during setup."""
+    """Test coordinator connects to MQTT events once players are available."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
 
     mock_config_entry.add_to_hass(hass)
