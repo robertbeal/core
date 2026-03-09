@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import datetime
 from datetime import timedelta
 import logging
 
+import pytz
 from yoto_api import AuthenticationError, YotoManager, YotoPlayer
+from yoto_api.const import POWER_SOURCE
 from yoto_api.utils import get_child_value
+from yoto_api.YotoPlayer import Alarm, YotoPlayerConfig
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL, CONF_TOKEN
@@ -79,26 +83,184 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
                     self.manager.update_card_detail, card_id
                 )
 
-    def _discover_all_players(self) -> None:
-        """Pre-populate manager.players with basic info for every device.
+    def _update_all_players(self) -> None:
+        """Fetch devices and update each player's status and config safely.
 
-        The library's update_players() loop can crash mid-iteration due to
-        a bug parsing status data (e.g. int(None) for missing temperature).
-        When that happens, devices after the crash point never get added to
-        manager.players. By fetching the device list first and creating basic
-        YotoPlayer entries, we ensure every device is at least visible even
-        when the detailed status parsing fails partway through.
+        The upstream yoto_api library's update_players() has a bug where
+        int(None) is called when a field like temperature is missing from
+        the API response. This crashes the entire update loop, leaving all
+        players with no status data.
+
+        This method replaces the library's monolithic update by calling the
+        per-device APIs directly and parsing each field with None guards.
+        Each player is updated independently so one failure doesn't block
+        the others.
         """
-        response = self.manager.api._get_devices(self.manager.token)  # noqa: SLF001
+        api = self.manager.api
+        token = self.manager.token
+        players = self.manager.players
+
+        response = api._get_devices(token)  # noqa: SLF001
         for device in response.get("devices", []):
             device_id = get_child_value(device, "deviceId")
-            if device_id and device_id not in self.manager.players:
-                self.manager.players[device_id] = YotoPlayer(
-                    id=device_id,
-                    name=get_child_value(device, "name"),
-                    device_type=get_child_value(device, "deviceType"),
-                    online=get_child_value(device, "online"),
+            if not device_id:
+                continue
+
+            if device_id not in players:
+                players[device_id] = YotoPlayer(id=device_id)
+
+            players[device_id].name = get_child_value(device, "name")
+            players[device_id].device_type = get_child_value(device, "deviceType")
+            players[device_id].online = get_child_value(device, "online")
+
+            try:
+                self._update_player_status(device_id)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to update status for player %s: %s: %s",
+                    device_id,
+                    type(err).__name__,
+                    err,
                 )
+
+            try:
+                self._update_player_config(device_id)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to update config for player %s: %s: %s",
+                    device_id,
+                    type(err).__name__,
+                    err,
+                )
+
+            players[device_id].last_updated_at = datetime.datetime.now(pytz.utc)
+
+    def _update_player_status(self, device_id: str) -> None:
+        """Update a single player's status fields from the API."""
+        api = self.manager.api
+        token = self.manager.token
+        player = self.manager.players[device_id]
+
+        status = api._get_device_status(token, device_id)  # noqa: SLF001
+
+        player.last_updated_api = datetime.datetime.now(pytz.utc)
+
+        active_card = get_child_value(status, "activeCard")
+        player.is_playing = active_card != "none"
+        player.active_card = active_card
+
+        player.ambient_light_sensor_reading = get_child_value(
+            status, "ambientLightSensorReading"
+        )
+        player.day_mode_on = get_child_value(status, "dayMode")
+        player.user_volume = get_child_value(status, "userVolumePercentage")
+        player.system_volume = get_child_value(status, "systemVolumePercentage")
+
+        if player.battery_level_percentage is None:
+            player.battery_level_percentage = get_child_value(
+                status, "batteryLevelPercentage"
+            )
+
+        temp = get_child_value(status, "temperatureCelcius")
+        if temp is not None and temp != "notSupported":
+            try:
+                if int(temp) != 0:
+                    player.temperature_celcius = temp
+            except ValueError, TypeError:
+                pass
+
+        player.bluetooth_audio_connected = get_child_value(
+            status, "isBluetoothAudioConnected"
+        )
+        player.charging = get_child_value(status, "isCharging")
+        player.audio_device_connected = get_child_value(
+            status, "isAudioDeviceConnected"
+        )
+        player.firmware_version = get_child_value(status, "firmwareVersion")
+        player.wifi_strength = get_child_value(status, "wifiStrength")
+        player.playing_source = get_child_value(status, "playingSource")
+        player.night_light_mode = get_child_value(status, "nightlightMode")
+
+        power_source = get_child_value(status, "powerSource")
+        player.power_source = POWER_SOURCE.get(power_source)
+
+    def _update_player_config(self, device_id: str) -> None:
+        """Update a single player's config fields from the API."""
+        api = self.manager.api
+        token = self.manager.token
+        player = self.manager.players[device_id]
+
+        config_response = api._get_device_config(token, device_id)  # noqa: SLF001
+
+        if player.config is None:
+            player.config = YotoPlayerConfig()
+
+        day_time = get_child_value(config_response, "device.config.dayTime")
+        if day_time is not None:
+            player.config.day_mode_time = datetime.datetime.strptime(
+                day_time, "%H:%M"
+            ).time()
+
+        player.config.day_display_brightness = get_child_value(
+            config_response, "device.config.dayDisplayBrightness"
+        )
+        player.config.day_ambient_colour = get_child_value(
+            config_response, "device.config.ambientColour"
+        )
+        player.config.day_max_volume_limit = get_child_value(
+            config_response, "device.config.maxVolumeLimit"
+        )
+
+        night_time = get_child_value(config_response, "device.config.nightTime")
+        if night_time is not None:
+            player.config.night_mode_time = datetime.datetime.strptime(
+                night_time, "%H:%M"
+            ).time()
+
+        player.config.night_ambient_colour = get_child_value(
+            config_response, "device.config.nightAmbientColour"
+        )
+        player.config.night_max_volume_limit = get_child_value(
+            config_response, "device.config.nightMaxVolumeLimit"
+        )
+        player.config.night_display_brightness = get_child_value(
+            config_response, "device.config.nightDisplayBrightness"
+        )
+
+        alarms = get_child_value(config_response, "device.config.alarms")
+        if alarms is not None:
+            self._parse_alarms(player, alarms)
+
+        player.last_update_config = datetime.datetime.now(pytz.utc)
+
+    @staticmethod
+    def _parse_alarms(player: YotoPlayer, alarms: list[str]) -> None:
+        """Parse alarm config strings into Alarm objects."""
+        if player.config.alarms is None:
+            player.config.alarms = []
+
+        for index in range(len(alarms)):
+            values = alarms[index].split(",")
+            if index > len(player.config.alarms) - 1:
+                enabled = True
+                if len(values) > 6:
+                    enabled = values[6] != "0"
+                player.config.alarms.append(
+                    Alarm(
+                        days_enabled=values[0],
+                        time=values[1],
+                        sound_id=values[2],
+                        volume=values[5],
+                        enabled=enabled,
+                    )
+                )
+            else:
+                player.config.alarms[index].days_enabled = values[0]
+                player.config.alarms[index].time = values[1]
+                player.config.alarms[index].sound_id = values[2]
+                player.config.alarms[index].volume = values[5]
+                if len(values) > 6:
+                    player.config.alarms[index].enabled = values[6] != "0"
 
     async def _async_update_data(self) -> dict[str, YotoPlayer]:
         """Fetch data from API."""
@@ -113,20 +275,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.persist_token_if_changed()
 
         try:
-            await self.hass.async_add_executor_job(self._discover_all_players)
-        except Exception as err:
-            _LOGGER.warning(
-                "Failed to pre-discover players: %s: %s", type(err).__name__, err
-            )
-
-        try:
-            await self.hass.async_add_executor_job(self.manager.update_players_status)
-        except TypeError as err:
-            _LOGGER.warning(
-                "Library bug during player status parsing, "
-                "continuing with partial data: %s",
-                err,
-            )
+            await self.hass.async_add_executor_job(self._update_all_players)
         except Exception as err:
             _LOGGER.error(
                 "Unexpected error during update: %s: %s", type(err).__name__, err

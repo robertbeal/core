@@ -45,7 +45,7 @@ async def test_coordinator_refreshes_token_on_update(
 
     assert mock_config_entry.state is ConfigEntryState.LOADED
     mock_yoto_manager.check_and_refresh_token.assert_called()
-    mock_yoto_manager.update_players_status.assert_called()
+    mock_yoto_manager.api._get_devices.assert_called()
 
 
 async def test_coordinator_setup_retry_on_api_error(
@@ -54,9 +54,7 @@ async def test_coordinator_setup_retry_on_api_error(
     mock_yoto_manager: MagicMock,
 ) -> None:
     """Test setup retry when API is unreachable."""
-    mock_yoto_manager.update_players_status.side_effect = ConnectionError(
-        "API unreachable"
-    )
+    mock_yoto_manager.api._get_devices.side_effect = ConnectionError("API unreachable")
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -102,9 +100,7 @@ async def test_coordinator_api_error_on_refresh(
 
     coordinator = mock_config_entry.runtime_data.coordinator
 
-    mock_yoto_manager.update_players_status.side_effect = ConnectionError(
-        "API unreachable"
-    )
+    mock_yoto_manager.api._get_devices.side_effect = ConnectionError("API unreachable")
 
     await coordinator.async_refresh()
 
@@ -336,23 +332,46 @@ async def test_mqtt_callback_fetches_card_detail_when_chapters_missing(
     mock_yoto_manager.update_card_detail.assert_called_once_with("card-1")
 
 
-async def test_coordinator_tolerates_library_type_error(
+async def test_coordinator_tolerates_single_player_status_failure(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test coordinator loads successfully when library raises TypeError.
+    """Test coordinator loads when one player's status API call fails.
 
-    The yoto_api library has a bug where int(None) is called when a player's
-    API response is missing temperature data. The coordinator should log a
-    warning and return partial player data rather than failing the update.
+    The coordinator fetches each player's status independently. If one
+    player's status call raises, the coordinator should log a warning and
+    continue with the remaining players rather than failing the update.
     """
-    player = YotoPlayer(id="player-1", name="My Yoto")
-    mock_yoto_manager.players = {"player-1": player}
-    mock_yoto_manager.update_players_status.side_effect = TypeError(
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "My Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_status.side_effect = TypeError(
         "int() argument must be a string, a bytes-like object or a real number, "
         "not 'NoneType'"
     )
+    mock_yoto_manager.api._get_device_config.return_value = {
+        "device": {
+            "config": {
+                "dayTime": "07:00",
+                "dayDisplayBrightness": "auto",
+                "ambientColour": "#ffffff",
+                "maxVolumeLimit": 10,
+                "nightTime": "19:00",
+                "nightAmbientColour": "#0",
+                "nightMaxVolumeLimit": 8,
+                "nightDisplayBrightness": "50",
+                "alarms": [],
+            }
+        }
+    }
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -362,21 +381,203 @@ async def test_coordinator_tolerates_library_type_error(
 
     coordinator = mock_config_entry.runtime_data.coordinator
     assert coordinator.last_update_success is True
-    assert coordinator.data == {"player-1": player}
+    assert "player-1" in coordinator.data
+    assert coordinator.data["player-1"].name == "My Yoto"
+    assert coordinator.data["player-1"].config is not None
 
 
-async def test_coordinator_returns_all_players_when_type_error_aborts_loop(
+async def test_coordinator_handles_config_failure_for_one_player(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test all players are returned even when update_players_status crashes mid-loop.
+    """Test config failure for one player doesn't block the other.
 
-    The library's update_players() iterates over devices and crashes on the
-    first player whose status response has None temperature. Players after the
-    crash never get added to manager.players. The coordinator should pre-populate
-    all players from the device list so every device is visible in HA even when
-    the detailed status parsing fails partway through.
+    Each player's config is fetched independently. If one player's config
+    call fails, the other player should still have its config populated.
+    """
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+            {
+                "deviceId": "player-2",
+                "name": "Bedroom Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_status.return_value = {
+        "activeCard": "none",
+        "ambientLightSensorReading": 0,
+        "batteryLevelPercentage": 100,
+        "dayMode": False,
+        "firmwareVersion": "v2.17.5",
+        "isBluetoothAudioConnected": False,
+        "isCharging": False,
+        "isAudioDeviceConnected": False,
+        "nightlightMode": "0x000000",
+        "playingSource": 0,
+        "powerSource": 2,
+        "systemVolumePercentage": 50,
+        "temperatureCelcius": "20",
+        "userVolumePercentage": 50,
+        "wifiStrength": -50,
+    }
+
+    def config_side_effect(_token, device_id):
+        if device_id == "player-1":
+            raise ConnectionError("Config API error for player-1")
+        return {
+            "device": {
+                "config": {
+                    "dayTime": "07:00",
+                    "dayDisplayBrightness": "auto",
+                    "ambientColour": "#ffffff",
+                    "maxVolumeLimit": 10,
+                    "nightTime": "19:00",
+                    "nightAmbientColour": "#0",
+                    "nightMaxVolumeLimit": 8,
+                    "nightDisplayBrightness": "50",
+                    "alarms": [],
+                }
+            }
+        }
+
+    mock_yoto_manager.api._get_device_config.side_effect = config_side_effect
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    assert coordinator.last_update_success is True
+
+    # Player 1 should have status but no config
+    assert "player-1" in coordinator.data
+    assert coordinator.data["player-1"].charging is False
+    assert coordinator.data["player-1"].config is None
+
+    # Player 2 should have both status and config
+    player2 = coordinator.data["player-2"]
+    assert player2.charging is False
+    assert player2.config is not None
+    assert player2.config.day_max_volume_limit == 10
+
+
+async def test_coordinator_persists_token_when_player_update_fails(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator persists refreshed token even when player update raises."""
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+
+    mock_yoto_manager.token.refresh_token = "new-refresh-token"
+    mock_yoto_manager.api._get_devices.side_effect = ConnectionError("API unreachable")
+
+    await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is False
+    assert mock_config_entry.data[CONF_TOKEN] == "new-refresh-token"
+
+
+async def test_coordinator_populates_status_fields_despite_none_temperature(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test all status fields are populated even when temperature is None.
+
+    The library's update_players() crashes on int(None) when temperature is
+    missing. Our coordinator bypasses the library's monolithic update and
+    parses each field safely, so temperature being None should not prevent
+    charging, day_mode, battery, wifi etc. from being populated.
+    """
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_status.return_value = {
+        "activeCard": "none",
+        "ambientLightSensorReading": 42,
+        "batteryLevelPercentage": 85,
+        "dayMode": True,
+        "firmwareVersion": "v2.17.5",
+        "isBluetoothAudioConnected": False,
+        "isCharging": True,
+        "isAudioDeviceConnected": False,
+        "nightlightMode": "0x000000",
+        "playingSource": 0,
+        "powerSource": 2,
+        "systemVolumePercentage": 47,
+        "temperatureCelcius": None,
+        "userVolumePercentage": 50,
+        "wifiStrength": -61,
+    }
+    mock_yoto_manager.api._get_device_config.return_value = {
+        "device": {
+            "config": {
+                "dayTime": "07:00",
+                "dayDisplayBrightness": "auto",
+                "ambientColour": "#ffffff",
+                "maxVolumeLimit": 10,
+                "nightTime": "19:00",
+                "nightAmbientColour": "#0",
+                "nightMaxVolumeLimit": 8,
+                "nightDisplayBrightness": "50",
+                "alarms": [],
+            }
+        }
+    }
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    player = coordinator.data["player-1"]
+
+    assert player.charging is True
+    assert player.day_mode_on is True
+    assert player.wifi_strength == -61
+    assert player.ambient_light_sensor_reading == 42
+    assert player.firmware_version == "v2.17.5"
+    assert player.temperature_celcius is None
+    assert player.config is not None
+    assert player.config.day_max_volume_limit == 10
+
+
+async def test_coordinator_populates_all_players_independently(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test each player's status is fetched independently.
+
+    When one player's status API call fails, the other player should still
+    have full status data populated.
     """
     mock_yoto_manager.api._get_devices.return_value = {
         "devices": [
@@ -395,17 +596,43 @@ async def test_coordinator_returns_all_players_when_type_error_aborts_loop(
         ]
     }
 
-    def crash_after_first_player() -> None:
-        """Simulate the library populating only the first player before crashing."""
-        mock_yoto_manager.players["player-1"] = YotoPlayer(
-            id="player-1", name="Lounge Yoto", device_type="v3", online=True
-        )
-        raise TypeError(
-            "int() argument must be a string, a bytes-like object or a real number, "
-            "not 'NoneType'"
-        )
+    def status_side_effect(_token, device_id):
+        if device_id == "player-1":
+            raise ConnectionError("API error for player-1")
+        return {
+            "activeCard": "none",
+            "ambientLightSensorReading": 10,
+            "batteryLevelPercentage": 90,
+            "dayMode": False,
+            "firmwareVersion": "v2.17.5",
+            "isBluetoothAudioConnected": False,
+            "isCharging": False,
+            "isAudioDeviceConnected": False,
+            "nightlightMode": "0x000000",
+            "playingSource": 0,
+            "powerSource": 2,
+            "systemVolumePercentage": 50,
+            "temperatureCelcius": "22",
+            "userVolumePercentage": 60,
+            "wifiStrength": -50,
+        }
 
-    mock_yoto_manager.update_players_status.side_effect = crash_after_first_player
+    mock_yoto_manager.api._get_device_status.side_effect = status_side_effect
+    mock_yoto_manager.api._get_device_config.return_value = {
+        "device": {
+            "config": {
+                "dayTime": "07:00",
+                "dayDisplayBrightness": "auto",
+                "ambientColour": "#ffffff",
+                "maxVolumeLimit": 10,
+                "nightTime": "19:00",
+                "nightAmbientColour": "#0",
+                "nightMaxVolumeLimit": 8,
+                "nightDisplayBrightness": "50",
+                "alarms": [],
+            }
+        }
+    }
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -414,36 +641,18 @@ async def test_coordinator_returns_all_players_when_type_error_aborts_loop(
     assert mock_config_entry.state is ConfigEntryState.LOADED
 
     coordinator = mock_config_entry.runtime_data.coordinator
-    assert coordinator.last_update_success is True
+    # Player 1 should exist with basic info only (status failed)
     assert "player-1" in coordinator.data
-    assert "player-2" in coordinator.data
-    assert coordinator.data["player-2"].name == "Bedroom Yoto"
-    assert coordinator.data["player-2"].online is True
+    assert coordinator.data["player-1"].name == "Lounge Yoto"
+    assert coordinator.data["player-1"].charging is None  # no status data
 
-
-async def test_coordinator_persists_token_when_player_update_fails(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    mock_yoto_manager: MagicMock,
-) -> None:
-    """Test coordinator persists refreshed token even when player update raises."""
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert mock_config_entry.state is ConfigEntryState.LOADED
-
-    coordinator = mock_config_entry.runtime_data.coordinator
-
-    mock_yoto_manager.token.refresh_token = "new-refresh-token"
-    mock_yoto_manager.update_players_status.side_effect = ConnectionError(
-        "API unreachable"
-    )
-
-    await coordinator.async_refresh()
-
-    assert coordinator.last_update_success is False
-    assert mock_config_entry.data[CONF_TOKEN] == "new-refresh-token"
+    # Player 2 should have full status data
+    player2 = coordinator.data["player-2"]
+    assert player2.name == "Bedroom Yoto"
+    assert player2.charging is False
+    assert player2.temperature_celcius == "22"
+    assert player2.wifi_strength == -50
+    assert player2.config is not None
 
 
 async def test_mqtt_callback_skips_card_detail_when_chapter_known(

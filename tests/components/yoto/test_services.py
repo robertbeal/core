@@ -29,7 +29,7 @@ async def test_update_service_triggers_refresh(
     """Test update service triggers a coordinator refresh."""
     await _setup(hass, mock_config_entry)
 
-    mock_yoto_manager.update_players_status.reset_mock()
+    mock_yoto_manager.api._get_devices.reset_mock()
 
     await hass.services.async_call(
         DOMAIN,
@@ -38,7 +38,7 @@ async def test_update_service_triggers_refresh(
         blocking=True,
     )
 
-    mock_yoto_manager.update_players_status.assert_called_once()
+    mock_yoto_manager.api._get_devices.assert_called_once()
 
 
 async def test_update_service_invalid_entry(
