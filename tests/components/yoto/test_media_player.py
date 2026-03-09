@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 from yoto_api import YotoPlayer
-from yoto_api.Card import Card, Chapter
+from yoto_api.Card import Card, Chapter, Track
 
 from homeassistant.components.media_player import (
     DOMAIN as MEDIA_PLAYER_DOMAIN,
@@ -655,3 +655,153 @@ async def test_browse_media_fetches_card_details(
     await client.receive_json()
 
     mock_yoto_manager.update_card_detail.assert_called_once_with("card1")
+
+
+async def test_browse_media_chapters_expandable_when_tracks_exist(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """Chapters should be expandable when they have tracks."""
+    mock_yoto_manager.library = {
+        "card1": Card(
+            id="card1",
+            title="The Gruffalo",
+            chapters={
+                "1": Chapter(
+                    key="1",
+                    title="Chapter 1",
+                    tracks={
+                        "01": Track(key="01", title="Track 1"),
+                    },
+                ),
+            },
+        ),
+    }
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    client = await hass_ws_client()
+    await client.send_json(
+        {
+            "id": 1,
+            "type": "media_player/browse_media",
+            "entity_id": ENTITY_ID,
+            "media_content_type": "music",
+            "media_content_id": "card1",
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    assert response["result"]["children"][0]["can_expand"] is True
+
+
+async def test_browse_media_chapter_shows_tracks(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """Browsing a chapter should list its tracks."""
+    mock_yoto_manager.library = {
+        "card1": Card(
+            id="card1",
+            title="The Gruffalo",
+            chapters={
+                "1": Chapter(
+                    key="1",
+                    title="Chapter 1",
+                    icon="https://example.com/ch1.png",
+                    tracks={
+                        "01": Track(
+                            key="01",
+                            title="Track 1",
+                            icon="https://example.com/t1.png",
+                        ),
+                        "02": Track(
+                            key="02",
+                            title="Track 2",
+                            icon="https://example.com/t2.png",
+                        ),
+                    },
+                ),
+            },
+        ),
+    }
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    client = await hass_ws_client()
+    await client.send_json(
+        {
+            "id": 1,
+            "type": "media_player/browse_media",
+            "entity_id": ENTITY_ID,
+            "media_content_type": "music",
+            "media_content_id": "card1+1",
+        }
+    )
+    response = await client.receive_json()
+
+    assert response["success"]
+    result = response["result"]
+    assert result["title"] == "Chapter 1"
+    assert len(result["children"]) == 2
+    assert result["children"][0]["title"] == "Track 1"
+    assert result["children"][0]["can_play"] is True
+    assert result["children"][0]["can_expand"] is False
+    assert result["children"][0]["media_content_id"] == "card1+1+01"
+    assert result["children"][0]["thumbnail"] == "https://example.com/t1.png"
+
+
+async def test_extra_state_attributes_chapter_and_track_icons(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Extra state attributes should include chapter and track icons from the library."""
+    mock_yoto_manager.library = {
+        CARD_ID: Card(
+            id=CARD_ID,
+            title="The Gruffalo",
+            chapters={
+                "C01": Chapter(
+                    key="C01",
+                    title="Chapter 1",
+                    icon="https://example.com/ch1.png",
+                    tracks={
+                        "T01": Track(
+                            key="T01",
+                            title="Track 1",
+                            icon="https://example.com/t1.png",
+                        ),
+                    },
+                ),
+            },
+        )
+    }
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        card_id=CARD_ID,
+        chapter_key="C01",
+        track_key="T01",
+    )
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.attributes["media_chapter_icon"] == "https://example.com/ch1.png"
+    assert state.attributes["media_track_icon"] == "https://example.com/t1.png"
+
+
+async def test_extra_state_attributes_empty_when_no_library_data(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Extra state attributes should not include icons when library data is absent."""
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    state = hass.states.get(ENTITY_ID)
+    assert "media_chapter_icon" not in state.attributes
+    assert "media_track_icon" not in state.attributes

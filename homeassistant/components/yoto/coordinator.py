@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL, CONF_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
@@ -41,6 +42,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             update_interval=timedelta(minutes=scan_minutes),
         )
         self.manager = manager
+        self.previous_players: set[str] = set()
 
     async def _async_setup(self) -> None:
         """Connect to MQTT events for real-time push updates."""
@@ -93,6 +95,20 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             ) from err
 
         self.persist_token_if_changed()
+
+        current_players = set(self.manager.players)
+        if stale_players := self.previous_players - current_players:
+            device_registry = dr.async_get(self.hass)
+            for player_id in stale_players:
+                device = device_registry.async_get_device(
+                    identifiers={(DOMAIN, player_id)}
+                )
+                if device:
+                    device_registry.async_update_device(
+                        device_id=device.id,
+                        remove_config_entry_id=self.config_entry.entry_id,
+                    )
+        self.previous_players = current_players
 
         return self.manager.players
 

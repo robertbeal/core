@@ -42,12 +42,18 @@ class YotoNumberEntityDescription(YotoEntityDescription, NumberEntityDescription
 
 
 def _brightness_value(player: YotoPlayer, field: str) -> float | None:
-    """Return the brightness as a float, or None when 'auto' or missing."""
+    """Return the brightness as a float, or None when missing.
+
+    The Yoto API returns "auto" when automatic brightness is enabled,
+    which corresponds to the maximum brightness of 100%.
+    """
     if player.config is None:
         return None
     value = getattr(player.config, field)
-    if value is None or value == "auto":
+    if value is None:
         return None
+    if value == "auto":
+        return 100.0
     return float(value)
 
 

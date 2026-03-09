@@ -93,12 +93,12 @@ async def test_night_display_brightness_auto(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night display brightness should report unknown when set to 'auto'."""
+    """Night display brightness should report 100 when set to 'auto'."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("number.my_yoto_night_display_brightness")
     assert state is not None
-    assert state.state == "unknown"
+    assert state.state == "100.0"
 
 
 async def test_set_max_volume_limit(

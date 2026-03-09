@@ -1,8 +1,6 @@
 rules:
   # Bronze
-  action-setup:
-    status: exempt
-    comment: This integration does not provide any service actions.
+  action-setup: done
   appropriate-polling: done
   brands:
     status: todo
@@ -12,8 +10,8 @@ rules:
   config-flow: done
   dependency-transparency: done
   docs-actions:
-    status: exempt
-    comment: This integration does not provide any service actions.
+    status: todo
+    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
   docs-high-level-description:
     status: todo
     comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
@@ -32,9 +30,7 @@ rules:
   unique-config-entry: done
 
   # Silver
-  action-exceptions:
-    status: exempt
-    comment: This integration does not provide any service actions.
+  action-exceptions: done
   config-entry-unloading: done
   docs-configuration-parameters:
     status: todo
@@ -92,7 +88,7 @@ rules:
   repair-issues:
     status: exempt
     comment: This integration currently has no repair issues.
-  stale-devices: todo
+  stale-devices: done
 
   # Platinum
   async-dependency:
@@ -101,4 +97,8 @@ rules:
   inject-websession:
     status: exempt
     comment: The yoto-api library manages its own HTTP sessions internally.
-  strict-typing: todo
+  strict-typing:
+    status: todo
+    comment: >-
+      Integration code passes mypy strict mode. Blocked on yoto-api
+      adding a py.typed marker (PEP 561).

@@ -49,23 +49,26 @@ async def test_unload_persists_refreshed_token(
     assert mock_config_entry.data[CONF_TOKEN] == "new-refresh-token"
 
 
-async def test_remove_config_entry_device(
+async def test_remove_config_entry_device_allows_stale(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
     device_registry: dr.DeviceRegistry,
 ) -> None:
-    """Removing a device via the UI should succeed."""
+    """Removing a device via the UI should succeed when the device is not in the API."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    device_entry = device_registry.async_get_device(identifiers={("yoto", PLAYER_ID)})
-    assert device_entry is not None
+    # Create a stale device that is not reported by the API
+    stale_device = device_registry.async_get_or_create(
+        config_entry_id=mock_config_entry.entry_id,
+        identifiers={("yoto", "stale-player")},
+    )
 
     result = await async_remove_config_entry_device(
-        hass, mock_config_entry, device_entry
+        hass, mock_config_entry, stale_device
     )
     assert result is True
 
@@ -107,3 +110,50 @@ async def test_new_player_creates_entities_dynamically(
     state = hass.states.get("sensor.second_player_battery")
     assert state is not None
     assert state.state == "50"
+
+
+async def test_stale_device_removed_on_poll(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    device_registry: dr.DeviceRegistry,
+) -> None:
+    """A device that disappears from the API should be removed from the registry."""
+    player = _make_player()
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = device_registry.async_get_device(identifiers={("yoto", PLAYER_ID)})
+    assert device is not None
+
+    # Simulate the player disappearing from the API on the next poll
+    mock_yoto_manager.players = {}
+    coordinator = mock_config_entry.runtime_data.coordinator
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    device = device_registry.async_get_device(identifiers={("yoto", PLAYER_ID)})
+    assert device is None
+
+
+async def test_remove_config_entry_device_blocks_active_device(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    device_registry: dr.DeviceRegistry,
+) -> None:
+    """Manual device removal should be blocked for devices still reported by the API."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device_entry = device_registry.async_get_device(identifiers={("yoto", PLAYER_ID)})
+    assert device_entry is not None
+
+    result = await async_remove_config_entry_device(
+        hass, mock_config_entry, device_entry
+    )
+    assert result is False

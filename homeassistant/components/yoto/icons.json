@@ -111,5 +111,10 @@
         "default": "mdi:weather-night"
       }
     }
+  },
+  "services": {
+    "update": {
+      "service": "mdi:refresh"
+    }
   }
 }

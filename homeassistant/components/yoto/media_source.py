@@ -94,7 +94,8 @@ class YotoMediaSource(MediaSource):
         manager = coordinator.manager
 
         if item.identifier:
-            card_id = item.identifier
+            parts = item.identifier.split("+")
+            card_id = parts[0]
             card = manager.library.get(card_id)
             if card is None:
                 raise Unresolvable(f"Card {card_id} not found in library")
@@ -104,29 +105,10 @@ class YotoMediaSource(MediaSource):
                     manager.update_card_detail, card_id
                 )
 
-            return BrowseMediaSource(
-                domain=DOMAIN,
-                identifier=card_id,
-                media_class=MediaClass.MUSIC,
-                media_content_type=MediaType.MUSIC,
-                title=card.title,
-                can_play=True,
-                can_expand=False,
-                children=[
-                    BrowseMediaSource(
-                        domain=DOMAIN,
-                        identifier=f"{card_id}+{chapter.key}",
-                        media_class=MediaClass.MUSIC,
-                        media_content_type=MediaType.MUSIC,
-                        title=chapter.title,
-                        can_play=True,
-                        can_expand=False,
-                        thumbnail=chapter.icon,
-                    )
-                    for chapter in card.chapters.values()
-                ],
-                children_media_class=MediaClass.MUSIC,
-            )
+            if len(parts) >= 2:
+                return self._browse_chapter_tracks(card, parts[1])
+
+            return self._browse_card_chapters(card)
 
         # Root: show all cards
         return BrowseMediaSource(
@@ -150,6 +132,70 @@ class YotoMediaSource(MediaSource):
                 )
                 for card in manager.library.values()
             ],
+            children_media_class=MediaClass.MUSIC,
+        )
+
+    def _browse_card_chapters(self, card) -> BrowseMediaSource:
+        """Build a browse response for a card's chapters."""
+        children: list[BrowseMediaSource] = []
+        if card.chapters:
+            children = [
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{card.id}+{chapter.key}",
+                    media_class=MediaClass.MUSIC,
+                    media_content_type=MediaType.MUSIC,
+                    title=chapter.title,
+                    can_play=True,
+                    can_expand=bool(chapter.tracks),
+                    thumbnail=chapter.icon,
+                )
+                for chapter in card.chapters.values()
+            ]
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=card.id,
+            media_class=MediaClass.MUSIC,
+            media_content_type=MediaType.MUSIC,
+            title=card.title,
+            can_play=True,
+            can_expand=False,
+            children=children,
+            children_media_class=MediaClass.MUSIC,
+        )
+
+    def _browse_chapter_tracks(self, card, chapter_key: str) -> BrowseMediaSource:
+        """Build a browse response for a chapter's tracks."""
+        chapter = card.chapters.get(chapter_key)
+        if chapter is None:
+            raise Unresolvable(f"Chapter {chapter_key} not found in card {card.id}")
+
+        children: list[BrowseMediaSource] = []
+        if chapter.tracks:
+            children = [
+                BrowseMediaSource(
+                    domain=DOMAIN,
+                    identifier=f"{card.id}+{chapter_key}+{track.key}",
+                    media_class=MediaClass.MUSIC,
+                    media_content_type=MediaType.MUSIC,
+                    title=track.title,
+                    can_play=True,
+                    can_expand=False,
+                    thumbnail=track.icon,
+                )
+                for track in chapter.tracks.values()
+            ]
+
+        return BrowseMediaSource(
+            domain=DOMAIN,
+            identifier=f"{card.id}+{chapter_key}",
+            media_class=MediaClass.MUSIC,
+            media_content_type=MediaType.MUSIC,
+            title=chapter.title,
+            can_play=True,
+            can_expand=False,
+            children=children,
             children_media_class=MediaClass.MUSIC,
         )
 

@@ -10,10 +10,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_TOKEN, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers.typing import ConfigType
 
 from .const import CLIENT_ID, DOMAIN
 from .coordinator import YotoDataUpdateCoordinator
+from .services import async_setup_services
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -25,6 +27,8 @@ PLATFORMS: list[Platform] = [
     Platform.TIME,
 ]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 @dataclass
 class YotoRuntimeData:
@@ -34,6 +38,12 @@ class YotoRuntimeData:
 
 
 type YotoConfigEntry = ConfigEntry[YotoRuntimeData]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Yoto integration."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: YotoConfigEntry) -> bool:
@@ -74,4 +84,9 @@ async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: YotoConfigEntry, device_entry: dr.DeviceEntry
 ) -> bool:
     """Remove a config entry from a device."""
-    return True
+    return not any(
+        identifier
+        for identifier in device_entry.identifiers
+        if identifier[0] == DOMAIN
+        and identifier[1] in entry.runtime_data.coordinator.data
+    )

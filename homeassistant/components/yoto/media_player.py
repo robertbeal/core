@@ -6,7 +6,7 @@ from functools import partial
 from typing import Any
 
 from yoto_api import YotoPlayer
-from yoto_api.Card import Card
+from yoto_api.Card import Card, Chapter, Track
 
 from homeassistant.components.media_player import (
     BrowseMedia,
@@ -159,6 +159,28 @@ class YotoMediaPlayerEntity(
         return self.coordinator.manager.library.get(card_id)
 
     @property
+    def _active_chapter(self) -> Chapter | None:
+        """Return the chapter for the currently playing content."""
+        card = self._active_card
+        if card is None or not card.chapters:
+            return None
+        chapter_key = self._player.chapter_key
+        if chapter_key is None:
+            return None
+        return card.chapters.get(chapter_key)
+
+    @property
+    def _active_track(self) -> Track | None:
+        """Return the track for the currently playing content."""
+        chapter = self._active_chapter
+        if chapter is None or not chapter.tracks:
+            return None
+        track_key = self._player.track_key
+        if track_key is None:
+            return None
+        return chapter.tracks.get(track_key)
+
+    @property
     def media_image_url(self) -> str | None:
         """Return the cover image URL of the current card."""
         card = self._active_card
@@ -201,6 +223,18 @@ class YotoMediaPlayerEntity(
         if self.media_content_id:
             return MediaType.MUSIC
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes including chapter and track icons."""
+        attrs: dict[str, Any] = {}
+        chapter = self._active_chapter
+        if chapter and chapter.icon:
+            attrs["media_chapter_icon"] = chapter.icon
+        track = self._active_track
+        if track and track.icon:
+            attrs["media_track_icon"] = track.icon
+        return attrs
 
     async def async_media_pause(self) -> None:
         """Pause playback."""
@@ -306,10 +340,14 @@ class YotoMediaPlayerEntity(
         library = self.coordinator.manager.library
 
         if media_content_id is not None and media_content_id != "library":
+            parts = media_content_id.split("+")
+            card_id = parts[0]
             await self.hass.async_add_executor_job(
-                self.coordinator.manager.update_card_detail, media_content_id
+                self.coordinator.manager.update_card_detail, card_id
             )
-            return self._browse_card_chapters(media_content_id, library)
+            if len(parts) >= 2:
+                return self._browse_chapter_tracks(card_id, parts[1], library)
+            return self._browse_card_chapters(card_id, library)
 
         return BrowseMedia(
             title="Yoto Library",
@@ -348,7 +386,7 @@ class YotoMediaPlayerEntity(
                     media_content_id=f"{card_id}+{chapter.key}",
                     media_content_type=MediaType.MUSIC,
                     can_play=True,
-                    can_expand=False,
+                    can_expand=bool(chapter.tracks),
                     thumbnail=chapter.icon,
                 )
                 for chapter in card.chapters.values()
@@ -358,6 +396,39 @@ class YotoMediaPlayerEntity(
             title=card.title,
             media_class=MediaClass.MUSIC,
             media_content_id=card_id,
+            media_content_type=MediaType.MUSIC,
+            can_play=True,
+            can_expand=False,
+            children=children,
+            children_media_class=MediaClass.MUSIC,
+        )
+
+    def _browse_chapter_tracks(
+        self, card_id: str, chapter_key: str, library: dict[str, Card]
+    ) -> BrowseMedia:
+        """Build a browse response for a chapter's tracks."""
+        card = library[card_id]
+        chapter = card.chapters[chapter_key]
+
+        children: list[BrowseMedia] = []
+        if chapter.tracks:
+            children = [
+                BrowseMedia(
+                    title=track.title,
+                    media_class=MediaClass.MUSIC,
+                    media_content_id=f"{card_id}+{chapter_key}+{track.key}",
+                    media_content_type=MediaType.MUSIC,
+                    can_play=True,
+                    can_expand=False,
+                    thumbnail=track.icon,
+                )
+                for track in chapter.tracks.values()
+            ]
+
+        return BrowseMedia(
+            title=chapter.title,
+            media_class=MediaClass.MUSIC,
+            media_content_id=f"{card_id}+{chapter_key}",
             media_content_type=MediaType.MUSIC,
             can_play=True,
             can_expand=False,

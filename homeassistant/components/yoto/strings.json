@@ -133,5 +133,17 @@
     "api_failed": {
       "message": "Failed to connect to the Yoto API."
     }
+  },
+  "services": {
+    "update": {
+      "name": "Update",
+      "description": "Force an immediate data refresh from the Yoto API.",
+      "fields": {
+        "config_entry": {
+          "name": "Config entry",
+          "description": "The Yoto config entry to refresh."
+        }
+      }
+    }
   }
 }

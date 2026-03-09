@@ -269,3 +269,49 @@ async def test_resolve_media_with_chapter_only(
     result = await async_resolve_media(hass, f"{URI_SCHEME}{DOMAIN}/card1+1", None)
 
     assert isinstance(result, PlayMedia)
+
+
+async def test_browse_media_chapter_shows_tracks(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test browsing a chapter returns its tracks."""
+    card = _make_card()
+    chapter = _make_chapter(key="1", title="Chapter 1")
+    track1 = _make_track(key="01", title="Track 1")
+    track2 = _make_track(key="02", title="Track 2")
+    chapter.tracks = {"01": track1, "02": track2}
+    card.chapters = {"1": chapter}
+    mock_yoto_manager.library = {"card1": card}
+
+    await _setup_media_source(hass, mock_config_entry, mock_yoto_manager)
+
+    result = await async_browse_media(hass, f"{URI_SCHEME}{DOMAIN}/card1+1")
+
+    assert result.title == "Chapter 1"
+    assert len(result.children) == 2
+    assert result.children[0].title == "Track 1"
+    assert result.children[0].identifier == "card1+1+01"
+    assert result.children[0].thumbnail == "https://example.com/track-icon-01.png"
+    assert result.children[1].title == "Track 2"
+
+
+async def test_browse_media_chapter_can_expand_when_tracks(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test that chapters are expandable when they have tracks."""
+    card = _make_card()
+    chapter = _make_chapter(key="1", title="Chapter 1")
+    track = _make_track(key="01")
+    chapter.tracks = {"01": track}
+    card.chapters = {"1": chapter}
+    mock_yoto_manager.library = {"card1": card}
+
+    await _setup_media_source(hass, mock_config_entry, mock_yoto_manager)
+
+    result = await async_browse_media(hass, f"{URI_SCHEME}{DOMAIN}/card1")
+
+    assert result.children[0].can_expand is True
