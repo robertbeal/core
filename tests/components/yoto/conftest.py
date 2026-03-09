@@ -54,6 +54,8 @@ def mock_yoto_manager() -> Generator[MagicMock]:
         manager.token.refresh_token = "mock-refresh-token"
         manager.players = {}
         manager.library = {}
+        manager.api = MagicMock()
+        manager.api._get_devices.return_value = {"devices": []}
 
         yield manager
 

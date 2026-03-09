@@ -336,6 +336,116 @@ async def test_mqtt_callback_fetches_card_detail_when_chapters_missing(
     mock_yoto_manager.update_card_detail.assert_called_once_with("card-1")
 
 
+async def test_coordinator_tolerates_library_type_error(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator loads successfully when library raises TypeError.
+
+    The yoto_api library has a bug where int(None) is called when a player's
+    API response is missing temperature data. The coordinator should log a
+    warning and return partial player data rather than failing the update.
+    """
+    player = YotoPlayer(id="player-1", name="My Yoto")
+    mock_yoto_manager.players = {"player-1": player}
+    mock_yoto_manager.update_players_status.side_effect = TypeError(
+        "int() argument must be a string, a bytes-like object or a real number, "
+        "not 'NoneType'"
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    assert coordinator.last_update_success is True
+    assert coordinator.data == {"player-1": player}
+
+
+async def test_coordinator_returns_all_players_when_type_error_aborts_loop(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test all players are returned even when update_players_status crashes mid-loop.
+
+    The library's update_players() iterates over devices and crashes on the
+    first player whose status response has None temperature. Players after the
+    crash never get added to manager.players. The coordinator should pre-populate
+    all players from the device list so every device is visible in HA even when
+    the detailed status parsing fails partway through.
+    """
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+            {
+                "deviceId": "player-2",
+                "name": "Bedroom Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+
+    def crash_after_first_player() -> None:
+        """Simulate the library populating only the first player before crashing."""
+        mock_yoto_manager.players["player-1"] = YotoPlayer(
+            id="player-1", name="Lounge Yoto", device_type="v3", online=True
+        )
+        raise TypeError(
+            "int() argument must be a string, a bytes-like object or a real number, "
+            "not 'NoneType'"
+        )
+
+    mock_yoto_manager.update_players_status.side_effect = crash_after_first_player
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    assert coordinator.last_update_success is True
+    assert "player-1" in coordinator.data
+    assert "player-2" in coordinator.data
+    assert coordinator.data["player-2"].name == "Bedroom Yoto"
+    assert coordinator.data["player-2"].online is True
+
+
+async def test_coordinator_persists_token_when_player_update_fails(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator persists refreshed token even when player update raises."""
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+
+    mock_yoto_manager.token.refresh_token = "new-refresh-token"
+    mock_yoto_manager.update_players_status.side_effect = ConnectionError(
+        "API unreachable"
+    )
+
+    await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is False
+    assert mock_config_entry.data[CONF_TOKEN] == "new-refresh-token"
+
+
 async def test_mqtt_callback_skips_card_detail_when_chapter_known(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
