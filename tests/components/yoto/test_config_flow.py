@@ -61,6 +61,8 @@ async def test_user_flow_auth_failure(
 ) -> None:
     """Test auth failure aborts."""
 
+    mock_yoto_manager_config_flow.token = None
+
     def mock_complete_with_error() -> None:
         device_auth_event.wait()
         raise AuthenticationError
@@ -132,6 +134,8 @@ async def test_reauth_flow_auth_failure(
     device_auth_event: Event,
 ) -> None:
     """Test reauth failure aborts with error."""
+
+    mock_yoto_manager_config_flow.token = None
 
     def mock_complete_with_error() -> None:
         device_auth_event.wait()

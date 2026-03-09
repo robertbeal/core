@@ -43,6 +43,14 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
         """Wait for device code auth."""
         await self.hass.async_add_executor_job(self._manager.device_code_flow_complete)
 
+    def _auth_succeeded(self) -> bool:
+        """Check if the manager obtained a valid token."""
+        return (
+            hasattr(self._manager, "token")
+            and self._manager.token is not None
+            and self._manager.token.refresh_token is not None
+        )
+
     def _start_login_task(self) -> asyncio.Task[None]:
         """Start the login background task."""
         self._login_task = self.hass.async_create_task(self._async_wait_for_auth())
@@ -63,7 +71,7 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
         login_task = self._login_task or self._start_login_task()
 
         if login_task.done():
-            if login_task.exception():
+            if login_task.exception() and not self._auth_succeeded():
                 return self.async_show_progress_done(next_step_id="user_error")
             return self.async_show_progress_done(next_step_id="user_finish")
 
@@ -118,7 +126,7 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
         login_task = self._login_task or self._start_login_task()
 
         if login_task.done():
-            if login_task.exception():
+            if login_task.exception() and not self._auth_succeeded():
                 return self.async_show_progress_done(next_step_id="reauth_error")
             return self.async_show_progress_done(next_step_id="reauth_finish")
 
