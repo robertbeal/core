@@ -2,16 +2,14 @@
   "config": {
     "step": {
       "user": {
-        "title": "Yoto",
-        "description": "To authenticate, visit {url} and enter the code: **{code}**"
+        "title": "Yoto"
       },
       "reauth_confirm": {
-        "title": "Re-authenticate with Yoto",
-        "description": "To re-authenticate, visit {url} and enter the code: **{code}**"
+        "title": "Re-authenticate with Yoto"
       }
     },
     "progress": {
-      "wait_for_auth": "Waiting for authentication. Please visit the link and enter the code shown above."
+      "wait_for_auth": "To authenticate, open the following URL and log in with your Yoto account:\n\n{url}\n\nEnter the code: **{code}**"
     },
     "abort": {
       "invalid_auth": "Authentication failed. Please try again.",
