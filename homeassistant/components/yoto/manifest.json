@@ -7,7 +7,7 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "loggers": ["paho_mqtt", "yoto_api"],
-  "requirements": ["yoto-api==2.2.4"],
+  "requirements": ["yoto-api==2.2.3"],
   "single_config_entry": true,
   "version": "0.1.0"
 }
