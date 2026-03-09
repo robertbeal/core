@@ -1,4 +1,4 @@
-"""Set up Yoto integration."""
+"""The Yoto integration."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 @dataclass
 class YotoRuntimeData:
-    """Runtime data for the Yoto integration."""
+    """Runtime data for Yoto."""
 
     coordinator: YotoDataUpdateCoordinator
 
@@ -41,13 +41,13 @@ type YotoConfigEntry = ConfigEntry[YotoRuntimeData]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Yoto integration."""
+    """Set up the integration."""
     async_setup_services(hass)
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: YotoConfigEntry) -> bool:
-    """Set up Yoto from a config entry."""
+    """Set up a config entry."""
     manager = await hass.async_add_executor_job(YotoManager, CLIENT_ID)
 
     refresh_token = entry.data.get(CONF_TOKEN)

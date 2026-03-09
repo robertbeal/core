@@ -1,4 +1,4 @@
-"""Time platform for the Yoto integration."""
+"""Platform for time."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import YotoConfigEntry
-from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
 
 PARALLEL_UPDATES = 1
@@ -22,7 +21,7 @@ PARALLEL_UPDATES = 1
 
 @dataclass(frozen=True, kw_only=True)
 class YotoTimeEntityDescription(YotoEntityDescription, TimeEntityDescription):
-    """Description of a Yoto time entity."""
+    """Describes a Yoto time entity."""
 
     value_fn: Callable[[YotoPlayer], time | None]
     config_field: str
@@ -53,14 +52,14 @@ async def async_setup_entry(
     entry: YotoConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Yoto time entities from a config entry."""
+    """Set up times."""
     coordinator = entry.runtime_data.coordinator
 
     known_players: set[str] = set()
 
     @callback
     def _async_add_new_players() -> None:
-        """Add time entities for any newly discovered players."""
+        """Add entities for newly discovered players."""
         current_players = set(coordinator.data)
         new_players = current_players - known_players
         if new_players:
@@ -76,18 +75,9 @@ async def async_setup_entry(
 
 
 class YotoTimeEntity(YotoEntity, TimeEntity):
-    """Representation of a Yoto time entity."""
+    """Yoto time entity."""
 
     entity_description: YotoTimeEntityDescription
-
-    def __init__(
-        self,
-        coordinator: YotoDataUpdateCoordinator,
-        player_id: str,
-        description: YotoTimeEntityDescription,
-    ) -> None:
-        """Initialise the time entity."""
-        super().__init__(coordinator, player_id, description)
 
     @property
     def native_value(self) -> time | None:

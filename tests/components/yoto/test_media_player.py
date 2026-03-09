@@ -37,7 +37,7 @@ async def test_media_player_idle_when_online(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Player should be idle when online but not playing."""
+    """Test media player idle when online."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
 
     mock_config_entry.add_to_hass(hass)
@@ -54,7 +54,7 @@ async def test_media_player_playing_state(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Player should reflect playing state."""
+    """Test media player playing state."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player(playback_status="playing")}
 
     mock_config_entry.add_to_hass(hass)
@@ -70,7 +70,7 @@ async def test_media_player_paused_state(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Player should reflect paused state."""
+    """Test media player paused state."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player(playback_status="paused")}
 
     mock_config_entry.add_to_hass(hass)
@@ -86,7 +86,7 @@ async def test_media_player_off_when_offline(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Player should be off when offline."""
+    """Test media player off when offline."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player(online=False)}
 
     mock_config_entry.add_to_hass(hass)
@@ -102,7 +102,7 @@ async def test_media_player_volume(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Volume should be normalised from 0-16 to 0.0-1.0."""
+    """Test volume normalisation from 0-16 to 0.0-1.0."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player(volume=8)}
 
     mock_config_entry.add_to_hass(hass)
@@ -118,7 +118,7 @@ async def test_media_player_track_info(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Media title and duration should be exposed."""
+    """Test media title and duration attributes."""
     mock_yoto_manager.players = {
         PLAYER_ID: _make_player(
             playback_status="playing",
@@ -158,7 +158,7 @@ async def test_media_pause(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Pause service should call pause_player on the manager."""
+    """Test media pause."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -176,7 +176,7 @@ async def test_media_play(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Play service should call resume_player on the manager."""
+    """Test media play."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -194,7 +194,7 @@ async def test_media_stop(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Stop service should call stop_player on the manager."""
+    """Test media stop."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -212,7 +212,7 @@ async def test_set_volume(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Set volume should call set_volume with value mapped to 0-100."""
+    """Test set volume maps to 0-100."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -230,7 +230,7 @@ async def test_play_media(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Play media service should call play_card with the card ID."""
+    """Test play media with card ID."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -252,7 +252,7 @@ async def test_device_class_and_volume_step(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Player should be classified as a speaker with 1/16 volume step."""
+    """Test device class and volume step."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get(ENTITY_ID)
@@ -267,7 +267,7 @@ async def test_library_metadata_when_card_in_library(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Library metadata should be exposed when the active card is in the library."""
+    """Test library metadata when the active card is in the library."""
     mock_yoto_manager.library = {
         CARD_ID: Card(
             id=CARD_ID,
@@ -289,7 +289,7 @@ async def test_library_metadata_missing_when_no_card(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Library metadata should be absent when no card is playing."""
+    """Test library metadata absent when no card is playing."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get(ENTITY_ID)
@@ -302,7 +302,7 @@ async def test_media_title_combines_chapter_and_track(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Media title should combine chapter and track when they differ."""
+    """Test media title combines chapter and track."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -320,7 +320,7 @@ async def test_media_title_shows_chapter_only_when_same_as_track(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Media title should show chapter only when it matches the track title."""
+    """Test media title shows chapter only when same as track."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -338,7 +338,7 @@ async def test_media_title_shows_chapter_when_no_track(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Media title should fall back to chapter title when there is no track title."""
+    """Test media title falls back to chapter when no track title."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -356,7 +356,7 @@ async def test_media_content_id_composite(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Content ID should combine card, chapter, and track keys."""
+    """Test content ID combines card, chapter, and track keys."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -375,7 +375,7 @@ async def test_media_content_id_none_when_incomplete(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Content ID should be absent when card/chapter/track keys are missing."""
+    """Test content ID absent when keys are missing."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -394,7 +394,7 @@ async def test_play_media_with_chapter_and_track(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Play media should parse card+chapter+track format."""
+    """Test play media with card+chapter+track format."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -418,7 +418,7 @@ async def test_play_media_with_chapter_only(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Play media should parse card+chapter format."""
+    """Test play media with card+chapter format."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -442,7 +442,7 @@ async def test_play_media_with_seconds(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Play media should parse card+chapter+track+seconds format."""
+    """Test play media with card+chapter+track+seconds format."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -466,7 +466,7 @@ async def test_seek(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Seek should replay the current card from the given position."""
+    """Test seek replays from the given position."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -493,7 +493,7 @@ async def test_next_track(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Next track should increment chapter and track keys."""
+    """Test next track increments chapter and track keys."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -520,7 +520,7 @@ async def test_previous_track(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Previous track should decrement chapter and track keys."""
+    """Test previous track decrements chapter and track keys."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -548,7 +548,7 @@ async def test_browse_media_root_shows_library(
     mock_yoto_manager: MagicMock,
     hass_ws_client: WebSocketGenerator,
 ) -> None:
-    """Browsing root should list all cards from the library."""
+    """Test browsing root lists library cards."""
     mock_yoto_manager.library = {
         "card1": Card(
             id="card1",
@@ -590,7 +590,7 @@ async def test_browse_media_card_shows_chapters(
     mock_yoto_manager: MagicMock,
     hass_ws_client: WebSocketGenerator,
 ) -> None:
-    """Browsing a card should list its chapters."""
+    """Test browsing a card lists its chapters."""
     mock_yoto_manager.library = {
         "card1": Card(
             id="card1",
@@ -636,7 +636,7 @@ async def test_browse_media_fetches_card_details(
     mock_yoto_manager: MagicMock,
     hass_ws_client: WebSocketGenerator,
 ) -> None:
-    """Browsing a card should fetch its chapter details if not already loaded."""
+    """Test browsing a card fetches chapter details if not loaded."""
     mock_yoto_manager.library = {
         "card1": Card(id="card1", title="The Gruffalo"),
     }
@@ -663,7 +663,7 @@ async def test_browse_media_chapters_expandable_when_tracks_exist(
     mock_yoto_manager: MagicMock,
     hass_ws_client: WebSocketGenerator,
 ) -> None:
-    """Chapters should be expandable when they have tracks."""
+    """Test chapters are expandable when they have tracks."""
     mock_yoto_manager.library = {
         "card1": Card(
             id="card1",
@@ -703,7 +703,7 @@ async def test_browse_media_chapter_shows_tracks(
     mock_yoto_manager: MagicMock,
     hass_ws_client: WebSocketGenerator,
 ) -> None:
-    """Browsing a chapter should list its tracks."""
+    """Test browsing a chapter lists its tracks."""
     mock_yoto_manager.library = {
         "card1": Card(
             id="card1",
@@ -759,7 +759,7 @@ async def test_extra_state_attributes_chapter_and_track_icons(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Extra state attributes should include chapter and track icons from the library."""
+    """Test extra state attributes include chapter and track icons."""
     mock_yoto_manager.library = {
         CARD_ID: Card(
             id=CARD_ID,
@@ -799,7 +799,7 @@ async def test_extra_state_attributes_empty_when_no_library_data(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Extra state attributes should not include icons when library data is absent."""
+    """Test extra state attributes omit icons when no library data."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get(ENTITY_ID)

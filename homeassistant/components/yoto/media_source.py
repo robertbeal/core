@@ -1,12 +1,4 @@
-"""Media source platform for the Yoto integration.
-
-Provides Yoto card library as a media source so audio can be played
-on any media player in Home Assistant (e.g. Sonos, Google Home).
-
-IMPORTANT: Yoto track URLs are signed S3/CloudFront URLs that expire
-after approximately one hour. We must always re-fetch card details via
-update_card_detail before resolving a track URL — never use cached URLs.
-"""
+"""Media source for Yoto."""
 
 from __future__ import annotations
 
@@ -34,12 +26,12 @@ MIME_TYPES: dict[str, str] = {
 
 
 async def async_get_media_source(hass: HomeAssistant) -> YotoMediaSource:
-    """Set up the Yoto media source."""
+    """Set up the media source."""
     return YotoMediaSource(hass)
 
 
 class YotoMediaSource(MediaSource):
-    """Provide Yoto card library as a media source."""
+    """Yoto media source."""
 
     name = "Yoto"
 
@@ -50,21 +42,16 @@ class YotoMediaSource(MediaSource):
 
     @property
     def _coordinator(self):
-        """Return the coordinator from the first config entry."""
+        """Return the coordinator."""
         entry = self.hass.config_entries.async_loaded_entries(DOMAIN)[0]
         return entry.runtime_data.coordinator
 
     async def async_resolve_media(self, item: MediaSourceItem) -> PlayMedia:
-        """Resolve a media item to a playable URL.
-
-        Always re-fetches card details to obtain fresh signed URLs,
-        since Yoto streams use time-limited S3/CloudFront URLs.
-        """
+        """Resolve a media item."""
         card_id, chapter_key, track_key = _parse_identifier(item.identifier)
         coordinator = self._coordinator
         manager = coordinator.manager
 
-        # Always re-fetch to get fresh signed URLs
         await self.hass.async_add_executor_job(manager.update_card_detail, card_id)
 
         card = manager.library.get(card_id)
@@ -89,7 +76,7 @@ class YotoMediaSource(MediaSource):
         return PlayMedia(track.trackUrl, mime_type)
 
     async def async_browse_media(self, item: MediaSourceItem) -> BrowseMediaSource:
-        """Browse the Yoto card library."""
+        """Browse the card library."""
         coordinator = self._coordinator
         manager = coordinator.manager
 
@@ -110,7 +97,6 @@ class YotoMediaSource(MediaSource):
 
             return self._browse_card_chapters(card)
 
-        # Root: show all cards
         return BrowseMediaSource(
             domain=DOMAIN,
             identifier=None,
@@ -136,7 +122,7 @@ class YotoMediaSource(MediaSource):
         )
 
     def _browse_card_chapters(self, card) -> BrowseMediaSource:
-        """Build a browse response for a card's chapters."""
+        """Browse a card's chapters."""
         children: list[BrowseMediaSource] = []
         if card.chapters:
             children = [
@@ -166,7 +152,7 @@ class YotoMediaSource(MediaSource):
         )
 
     def _browse_chapter_tracks(self, card, chapter_key: str) -> BrowseMediaSource:
-        """Build a browse response for a chapter's tracks."""
+        """Browse a chapter's tracks."""
         chapter = card.chapters.get(chapter_key)
         if chapter is None:
             raise Unresolvable(f"Chapter {chapter_key} not found in card {card.id}")
@@ -201,7 +187,7 @@ class YotoMediaSource(MediaSource):
 
 
 def _parse_identifier(identifier: str) -> tuple[str, str | None, str | None]:
-    """Parse a media source identifier into card_id, chapter_key, track_key."""
+    """Parse a media source identifier."""
     parts = identifier.split("+")
     card_id = parts[0]
     chapter_key = parts[1] if len(parts) >= 2 else None

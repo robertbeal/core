@@ -45,7 +45,7 @@ async def test_online_binary_sensor_on(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Online binary sensor should be on when player is online."""
+    """Test online binary sensor is on when player is online."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager, online=True)
 
     state = hass.states.get("binary_sensor.my_yoto_online")
@@ -59,7 +59,7 @@ async def test_online_binary_sensor_off(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Online binary sensor should be off when player is offline."""
+    """Test online binary sensor is off when player is offline."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager, online=False)
 
     state = hass.states.get("binary_sensor.my_yoto_online")
@@ -72,7 +72,7 @@ async def test_charging_binary_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Charging binary sensor should reflect charging state."""
+    """Test the charging binary sensor."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager, charging=True)
 
     state = hass.states.get("binary_sensor.my_yoto_charging")
@@ -89,7 +89,7 @@ async def test_bluetooth_connected_binary_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Bluetooth binary sensor should reflect connection state when enabled."""
+    """Test the bluetooth connected binary sensor."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -108,7 +108,7 @@ async def test_sleep_timer_binary_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Sleep timer binary sensor should reflect active state."""
+    """Test the sleep timer binary sensor."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, sleep_timer_active=True
     )
@@ -123,7 +123,7 @@ async def test_binary_sensor_none_is_unknown(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Binary sensor should report unknown when the underlying value is None."""
+    """Test binary sensor reports unknown when value is None."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager, charging=None)
 
     state = hass.states.get("binary_sensor.my_yoto_charging")
@@ -136,7 +136,7 @@ async def test_day_mode_on_binary_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Day mode binary sensor should reflect whether day mode is active."""
+    """Test the day mode binary sensor when active."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager, day_mode_on=True)
 
     state = hass.states.get("binary_sensor.my_yoto_day_mode")
@@ -149,7 +149,7 @@ async def test_day_mode_off_binary_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Day mode binary sensor should be off during night mode."""
+    """Test the day mode binary sensor during night mode."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager, day_mode_on=False)
 
     state = hass.states.get("binary_sensor.my_yoto_day_mode")
@@ -163,7 +163,7 @@ async def test_audio_device_connected_binary_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Audio device connected binary sensor should reflect state when enabled."""
+    """Test the audio device connected binary sensor."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, audio_device_connected=True
     )
@@ -180,7 +180,7 @@ async def test_night_light_mode_binary_sensor_on(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night light mode should be on when not 'off' (when enabled)."""
+    """Test night light mode is on when not off."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, night_light_mode="0xff0000"
     )
@@ -196,7 +196,7 @@ async def test_night_light_mode_binary_sensor_off(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night light mode should be off when value is 'off' (when enabled)."""
+    """Test night light mode is off when value is off."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, night_light_mode="off"
     )
@@ -212,7 +212,7 @@ async def test_niche_binary_sensors_disabled_by_default(
     mock_yoto_manager: MagicMock,
     entity_registry: er.EntityRegistry,
 ) -> None:
-    """Niche binary sensors should be disabled by default in the entity registry."""
+    """Test niche binary sensors are disabled by default."""
     await _setup_player(
         hass,
         mock_config_entry,

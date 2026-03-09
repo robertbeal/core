@@ -1,4 +1,4 @@
-"""Number platform for the Yoto integration."""
+"""Platform for number."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import YotoConfigEntry
-from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
 
 PARALLEL_UPDATES = 1
@@ -22,31 +21,27 @@ PARALLEL_UPDATES = 1
 def _set_player_config_field(
     manager: YotoManager, player_id: str, field: str, value: float
 ) -> None:
-    """Set a single field on YotoPlayerConfig and push to the API."""
+    """Set a player config field."""
     config = YotoPlayerConfig()
     setattr(config, field, int(value))
     manager.set_player_config(player_id, config)
 
 
 def _set_sleep_timer(manager: YotoManager, player_id: str, value: float) -> None:
-    """Set the sleep timer via the API."""
+    """Set the sleep timer."""
     manager.set_sleep(player_id, int(value))
 
 
 @dataclass(frozen=True, kw_only=True)
 class YotoNumberEntityDescription(YotoEntityDescription, NumberEntityDescription):
-    """Description of a Yoto number entity."""
+    """Describes a Yoto number entity."""
 
     value_fn: Callable[[YotoPlayer], float | None]
     set_fn: Callable[[YotoManager, str, float], None]
 
 
 def _brightness_value(player: YotoPlayer, field: str) -> float | None:
-    """Return the brightness as a float, or None when missing.
-
-    The Yoto API returns "auto" when automatic brightness is enabled,
-    which corresponds to the maximum brightness of 100%.
-    """
+    """Return the brightness value."""
     if player.config is None:
         return None
     value = getattr(player.config, field)
@@ -138,14 +133,14 @@ async def async_setup_entry(
     entry: YotoConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Yoto number entities from a config entry."""
+    """Set up numbers."""
     coordinator = entry.runtime_data.coordinator
 
     known_players: set[str] = set()
 
     @callback
     def _async_add_new_players() -> None:
-        """Add number entities for any newly discovered players."""
+        """Add entities for newly discovered players."""
         current_players = set(coordinator.data)
         new_players = current_players - known_players
         if new_players:
@@ -161,18 +156,9 @@ async def async_setup_entry(
 
 
 class YotoNumberEntity(YotoEntity, NumberEntity):
-    """Representation of a Yoto number entity."""
+    """Yoto number entity."""
 
     entity_description: YotoNumberEntityDescription
-
-    def __init__(
-        self,
-        coordinator: YotoDataUpdateCoordinator,
-        player_id: str,
-        description: YotoNumberEntityDescription,
-    ) -> None:
-        """Initialise the number entity."""
-        super().__init__(coordinator, player_id, description)
 
     @property
     def native_value(self) -> float | None:

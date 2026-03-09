@@ -54,7 +54,7 @@ async def test_day_max_volume_limit(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Day max volume limit should report the configured value."""
+    """Test the day max volume limit number."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("number.my_yoto_day_max_volume_limit")
@@ -67,7 +67,7 @@ async def test_night_max_volume_limit(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night max volume limit should report the configured value."""
+    """Test the night max volume limit number."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("number.my_yoto_night_max_volume_limit")
@@ -80,7 +80,7 @@ async def test_day_display_brightness(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Day display brightness should report the numeric value."""
+    """Test the day display brightness number."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("number.my_yoto_day_display_brightness")
@@ -93,7 +93,7 @@ async def test_night_display_brightness_auto(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night display brightness should report 100 when set to 'auto'."""
+    """Test night display brightness reports 100 when set to auto."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("number.my_yoto_night_display_brightness")
@@ -106,7 +106,7 @@ async def test_set_max_volume_limit(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Setting max volume limit should call set_player_config."""
+    """Test setting the max volume limit."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -128,7 +128,7 @@ async def test_set_display_brightness(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Setting display brightness should call set_player_config."""
+    """Test setting the display brightness."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -148,7 +148,7 @@ async def test_number_entities_are_config_category(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Number entities should be in the config entity category."""
+    """Test number entities are in the config category."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     ent_reg = er.async_get(hass)
@@ -162,7 +162,7 @@ async def test_sleep_timer_seconds_remaining(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Sleep timer should report the remaining seconds."""
+    """Test the sleep timer reports remaining seconds."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -180,7 +180,7 @@ async def test_set_sleep_timer(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Setting sleep timer should call set_sleep on the manager."""
+    """Test setting the sleep timer."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(

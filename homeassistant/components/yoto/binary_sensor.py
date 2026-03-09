@@ -1,4 +1,4 @@
-"""Binary sensor platform for the Yoto integration."""
+"""Platform for binary sensor."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import YotoConfigEntry
-from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
 
 PARALLEL_UPDATES = 0
@@ -27,7 +26,7 @@ PARALLEL_UPDATES = 0
 class YotoBinarySensorEntityDescription(
     YotoEntityDescription, BinarySensorEntityDescription
 ):
-    """Description of a Yoto binary sensor entity."""
+    """Describes a Yoto binary sensor."""
 
     value_fn: Callable[[YotoPlayer], bool | None]
 
@@ -89,14 +88,14 @@ async def async_setup_entry(
     entry: YotoConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Yoto binary sensor entities from a config entry."""
+    """Set up binary sensors."""
     coordinator = entry.runtime_data.coordinator
 
     known_players: set[str] = set()
 
     @callback
     def _async_add_new_players() -> None:
-        """Add binary sensor entities for any newly discovered players."""
+        """Add entities for newly discovered players."""
         current_players = set(coordinator.data)
         new_players = current_players - known_players
         if new_players:
@@ -112,18 +111,9 @@ async def async_setup_entry(
 
 
 class YotoBinarySensorEntity(YotoEntity, BinarySensorEntity):
-    """Representation of a Yoto binary sensor."""
+    """Yoto binary sensor entity."""
 
     entity_description: YotoBinarySensorEntityDescription
-
-    def __init__(
-        self,
-        coordinator: YotoDataUpdateCoordinator,
-        player_id: str,
-        description: YotoBinarySensorEntityDescription,
-    ) -> None:
-        """Initialise the binary sensor entity."""
-        super().__init__(coordinator, player_id, description)
 
     @property
     def is_on(self) -> bool | None:

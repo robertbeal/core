@@ -162,11 +162,7 @@ async def test_resolve_media_always_refetches_card_details(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test that resolve always re-fetches card details to get fresh signed URLs.
-
-    Yoto streams are signed S3/CloudFront URLs that expire after ~1 hour,
-    so we must always request fresh URLs rather than using cached ones.
-    """
+    """Test resolve always re-fetches card details for fresh signed URLs."""
     card = _make_card()
     chapter = _make_chapter(key="1")
     track = _make_track(
@@ -196,7 +192,7 @@ async def test_resolve_media_mp3_mime_type(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test that mp3 format resolves to audio/mpeg MIME type."""
+    """Test mp3 format resolves to audio/mpeg MIME type."""
     card = _make_card()
     chapter = _make_chapter(key="1")
     track = _make_track(key="01", fmt="mp3")
@@ -216,7 +212,7 @@ async def test_resolve_media_opus_mime_type(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test that opus format resolves to audio/opus MIME type."""
+    """Test opus format resolves to audio/opus MIME type."""
     card = _make_card()
     chapter = _make_chapter(key="1")
     track = _make_track(key="01", fmt="opus")
@@ -302,7 +298,7 @@ async def test_browse_media_chapter_can_expand_when_tracks(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test that chapters are expandable when they have tracks."""
+    """Test chapters are expandable when they have tracks."""
     card = _make_card()
     chapter = _make_chapter(key="1", title="Chapter 1")
     track = _make_track(key="01")

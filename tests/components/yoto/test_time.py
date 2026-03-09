@@ -49,7 +49,7 @@ async def test_day_mode_time(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Day mode time should report the configured time."""
+    """Test the day mode time."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("time.my_yoto_day_mode_time")
@@ -62,7 +62,7 @@ async def test_night_mode_time(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night mode time should report the configured time."""
+    """Test the night mode time."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("time.my_yoto_night_mode_time")
@@ -75,7 +75,7 @@ async def test_time_unknown_when_none(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Time should report unknown when config value is None."""
+    """Test time unknown when config value is None."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -93,7 +93,7 @@ async def test_set_day_mode_time(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Setting day mode time should call set_player_config."""
+    """Test setting day mode time."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -115,7 +115,7 @@ async def test_time_entities_are_config_category(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Time entities should be in the config entity category."""
+    """Test time entities have config entity category."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     ent_reg = er.async_get(hass)

@@ -4,23 +4,23 @@ rules:
   appropriate-polling: done
   brands:
     status: todo
-    comment: Brand assets will be submitted to home-assistant/brands as part of the PR process.
+    comment: will be submitted to home-assistant/brands as part of the PR process
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done
   dependency-transparency: done
   docs-actions:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-high-level-description:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-installation-instructions:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-removal-instructions:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   entity-event-setup: done
   entity-unique-id: done
   has-entity-name: done
@@ -34,10 +34,10 @@ rules:
   config-entry-unloading: done
   docs-configuration-parameters:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-installation-parameters:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   entity-unavailable: done
   integration-owner: done
   log-when-unavailable: done
@@ -50,31 +50,31 @@ rules:
   diagnostics: done
   discovery-update-info:
     status: exempt
-    comment: This is a cloud-based integration and does not support discovery.
+    comment: This is a cloud-based integration and does not support discovery
   discovery:
     status: exempt
-    comment: This is a cloud-based integration and does not support discovery.
+    comment: This is a cloud-based integration and does not support discovery
   docs-data-update:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-examples:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-known-limitations:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-supported-devices:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-supported-functions:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-troubleshooting:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   docs-use-cases:
     status: todo
-    comment: Documentation will be submitted to home-assistant/home-assistant.io as part of the PR process.
+    comment: will be submitted to home-assistant/home-assistant.io as part of the PR process
   dynamic-devices: done
   entity-category: done
   entity-device-class: done

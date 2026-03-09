@@ -36,12 +36,7 @@ def mock_config_entry() -> MockConfigEntry:
 
 @pytest.fixture
 def device_auth_event() -> Generator[Event]:
-    """Provide a threading Event to control device code auth completion.
-
-    We use threading.Event (not asyncio.Event) because YotoManager methods
-    are synchronous and run in the executor via async_add_executor_job.
-    The event is set on teardown to unblock any lingering executor threads.
-    """
+    """Provide a threading Event to control device code auth completion."""
     event = Event()
     yield event
     event.set()
@@ -49,11 +44,7 @@ def device_auth_event() -> Generator[Event]:
 
 @pytest.fixture
 def mock_yoto_manager() -> Generator[MagicMock]:
-    """Fixture to mock the YotoManager for integration setup and coordinator tests.
-
-    Patches YotoManager in the main yoto module (used by __init__.py and coordinator).
-    The mock instance is shared across all modules that import from yoto.
-    """
+    """Mock the YotoManager for integration tests."""
     with patch(
         "homeassistant.components.yoto.YotoManager",
         autospec=True,
@@ -71,11 +62,7 @@ def mock_yoto_manager() -> Generator[MagicMock]:
 def mock_yoto_manager_config_flow(
     device_auth_event: Event,
 ) -> Generator[MagicMock]:
-    """Fixture to mock the YotoManager for config flow tests.
-
-    Patches YotoManager in the config_flow module. Uses a threading Event
-    to simulate the blocking device_code_flow_complete call.
-    """
+    """Mock the YotoManager for config flow tests."""
     with patch(
         "homeassistant.components.yoto.config_flow.YotoManager",
         autospec=True,

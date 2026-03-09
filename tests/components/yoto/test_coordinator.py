@@ -19,7 +19,7 @@ async def test_coordinator_updates_players(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should return the players dict from the manager."""
+    """Test coordinator returns players dict."""
     player = YotoPlayer(id="player-1", name="My Yoto")
     mock_yoto_manager.players = {"player-1": player}
 
@@ -38,7 +38,7 @@ async def test_coordinator_refreshes_token_on_update(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should call check_and_refresh_token during updates."""
+    """Test coordinator refreshes token during updates."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -53,7 +53,7 @@ async def test_coordinator_setup_retry_on_api_error(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Setup should retry when the API is unreachable."""
+    """Test setup retry when API is unreachable."""
     mock_yoto_manager.update_players_status.side_effect = ConnectionError(
         "API unreachable"
     )
@@ -70,7 +70,7 @@ async def test_coordinator_auth_error_on_refresh(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Auth error during coordinator refresh should raise UpdateFailed."""
+    """Test auth error during refresh."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -79,7 +79,6 @@ async def test_coordinator_auth_error_on_refresh(
 
     coordinator = mock_config_entry.runtime_data.coordinator
 
-    # Simulate auth failure on subsequent refresh
     mock_yoto_manager.check_and_refresh_token.side_effect = AuthenticationError(
         "Token expired"
     )
@@ -94,7 +93,7 @@ async def test_coordinator_api_error_on_refresh(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """API error during coordinator refresh should raise UpdateFailed."""
+    """Test API error during refresh."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -103,7 +102,6 @@ async def test_coordinator_api_error_on_refresh(
 
     coordinator = mock_config_entry.runtime_data.coordinator
 
-    # Simulate API failure on subsequent refresh
     mock_yoto_manager.update_players_status.side_effect = ConnectionError(
         "API unreachable"
     )
@@ -118,14 +116,13 @@ async def test_coordinator_persists_refreshed_token(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should persist a new refresh token to the config entry."""
+    """Test coordinator persists a new refresh token."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
     assert mock_config_entry.state is ConfigEntryState.LOADED
 
-    # Simulate the library obtaining a new refresh token
     mock_yoto_manager.token.refresh_token = "new-refresh-token"
 
     coordinator = mock_config_entry.runtime_data.coordinator
@@ -139,7 +136,7 @@ async def test_coordinator_skips_persist_when_token_unchanged(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should not update the config entry when the token is unchanged."""
+    """Test coordinator skips persist when token is unchanged."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -151,7 +148,6 @@ async def test_coordinator_skips_persist_when_token_unchanged(
     coordinator = mock_config_entry.runtime_data.coordinator
     await coordinator.async_refresh()
 
-    # Config entry data should be the same object — no update call made
     assert mock_config_entry.data[CONF_TOKEN] == "mock-refresh-token"
     assert mock_config_entry.version == version_before
 
@@ -177,7 +173,7 @@ async def test_coordinator_connects_to_events(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should connect to MQTT events during setup."""
+    """Test coordinator connects to MQTT events during setup."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
 
     mock_config_entry.add_to_hass(hass)
@@ -193,7 +189,7 @@ async def test_mqtt_callback_updates_entities(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """MQTT callback should push updated player data to entities."""
+    """Test MQTT callback updates entities."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
 
     mock_config_entry.add_to_hass(hass)
@@ -203,14 +199,10 @@ async def test_mqtt_callback_updates_entities(
     state = hass.states.get(ENTITY_ID)
     assert state.state == MediaPlayerState.IDLE
 
-    # Simulate MQTT pushing a playing state — the library mutates the
-    # player in-place, then invokes the callback from a background thread.
     mock_yoto_manager.players[PLAYER_ID] = _make_player(playback_status="playing")
 
-    # Retrieve the callback that the coordinator registered
     mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
 
-    # Fire the callback from a background thread, as paho-mqtt would
     thread = Thread(target=mqtt_callback)
     thread.start()
     thread.join()
@@ -225,7 +217,7 @@ async def test_coordinator_disconnects_on_unload(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should disconnect MQTT on unload."""
+    """Test coordinator disconnects MQTT on unload."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -243,7 +235,7 @@ async def test_coordinator_fetches_library_on_first_poll(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should fetch the library when it is empty."""
+    """Test coordinator fetches library when empty."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -257,7 +249,7 @@ async def test_coordinator_skips_library_when_already_populated(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Coordinator should not re-fetch the library on subsequent polls."""
+    """Test coordinator skips library when already populated."""
     mock_yoto_manager.library = {"card-1": Card(id="card-1", title="Test Card")}
 
     mock_config_entry.add_to_hass(hass)
@@ -278,14 +270,13 @@ async def test_mqtt_callback_fetches_card_detail_for_unknown_card(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """MQTT callback should fetch card details when the active card is not in the library."""
+    """Test MQTT callback fetches card detail for unknown card."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    # Simulate MQTT delivering a playing state with a card that is not in the library
     mock_yoto_manager.players[PLAYER_ID] = _make_player(
         card_id="card-1",
         chapter_key="ch-01",
@@ -306,7 +297,7 @@ async def test_mqtt_callback_fetches_card_detail_when_chapters_missing(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """MQTT callback should fetch card details when the card has no chapters."""
+    """Test MQTT callback fetches card detail when chapters missing."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
     mock_yoto_manager.library = {"card-1": Card(id="card-1", title="Test Card")}
 
@@ -314,7 +305,6 @@ async def test_mqtt_callback_fetches_card_detail_when_chapters_missing(
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    # Simulate MQTT delivering a card that IS in library but has no chapters
     mock_yoto_manager.players[PLAYER_ID] = _make_player(
         card_id="card-1",
         chapter_key="ch-01",
@@ -335,7 +325,7 @@ async def test_mqtt_callback_skips_card_detail_when_chapter_known(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """MQTT callback should not fetch card details when the chapter is already known."""
+    """Test MQTT callback skips card detail when chapter known."""
     mock_yoto_manager.players = {PLAYER_ID: _make_player()}
     mock_yoto_manager.library = {
         "card-1": Card(
@@ -349,7 +339,6 @@ async def test_mqtt_callback_skips_card_detail_when_chapter_known(
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    # Simulate MQTT delivering a card with a known chapter
     mock_yoto_manager.players[PLAYER_ID] = _make_player(
         card_id="card-1",
         chapter_key="ch-01",

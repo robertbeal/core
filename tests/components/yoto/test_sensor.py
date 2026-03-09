@@ -54,7 +54,7 @@ async def test_battery_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Battery sensor should expose battery_level_percentage."""
+    """Test the battery sensor."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, battery_level_percentage=75
     )
@@ -71,7 +71,7 @@ async def test_temperature_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Temperature sensor should expose temperature_celcius."""
+    """Test the temperature sensor."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, temperature_celcius=22
     )
@@ -88,7 +88,7 @@ async def test_wifi_strength_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """WiFi strength sensor should expose wifi_strength as dBm."""
+    """Test the WiFi signal strength sensor."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager, wifi_strength=-61)
 
     state = hass.states.get("sensor.my_yoto_wifi_signal_strength")
@@ -106,7 +106,7 @@ async def test_firmware_version_sensor(
     mock_yoto_manager: MagicMock,
     entity_registry: er.EntityRegistry,
 ) -> None:
-    """Firmware version sensor should be a diagnostic entity."""
+    """Test the firmware version sensor is a diagnostic entity."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, firmware_version="2.17.5"
     )
@@ -125,7 +125,7 @@ async def test_sensor_unavailable_when_none(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Sensor should report unknown when the underlying value is None."""
+    """Test sensor reports unknown when value is None."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, battery_level_percentage=None
     )
@@ -141,7 +141,7 @@ async def test_last_updated_at_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Last updated at sensor should expose a timestamp when enabled."""
+    """Test the last updated at sensor."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -161,7 +161,7 @@ async def test_ambient_light_sensor(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Ambient light sensor should expose illuminance in lux when enabled."""
+    """Test the ambient light sensor."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, ambient_light_sensor_reading=350
     )
@@ -180,7 +180,7 @@ async def test_battery_temperature_sensor(
     mock_yoto_manager: MagicMock,
     entity_registry: er.EntityRegistry,
 ) -> None:
-    """Battery temperature sensor should be a diagnostic entity when enabled."""
+    """Test the battery temperature sensor is a diagnostic entity."""
     await _setup_player(
         hass, mock_config_entry, mock_yoto_manager, battery_temperature=32
     )
@@ -202,7 +202,7 @@ async def test_niche_sensors_disabled_by_default(
     mock_yoto_manager: MagicMock,
     entity_registry: er.EntityRegistry,
 ) -> None:
-    """Niche sensors should be disabled by default in the entity registry."""
+    """Test niche sensors are disabled by default."""
     await _setup_player(
         hass,
         mock_config_entry,

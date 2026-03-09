@@ -1,4 +1,4 @@
-"""Media player platform for the Yoto integration."""
+"""Platform for media player."""
 
 from __future__ import annotations
 
@@ -41,14 +41,14 @@ async def async_setup_entry(
     entry: YotoConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Yoto media player entities from a config entry."""
+    """Set up media players."""
     coordinator = entry.runtime_data.coordinator
 
     known_players: set[str] = set()
 
     @callback
     def _async_add_new_players() -> None:
-        """Add media player entities for any newly discovered players."""
+        """Add entities for newly discovered players."""
         current_players = set(coordinator.data)
         new_players = current_players - known_players
         if new_players:
@@ -65,7 +65,7 @@ async def async_setup_entry(
 class YotoMediaPlayerEntity(
     CoordinatorEntity[YotoDataUpdateCoordinator], MediaPlayerEntity
 ):
-    """Representation of a Yoto player as a media player."""
+    """Yoto media player entity."""
 
     _attr_has_entity_name = True
     _attr_name = None
@@ -88,7 +88,7 @@ class YotoMediaPlayerEntity(
         coordinator: YotoDataUpdateCoordinator,
         player_id: str,
     ) -> None:
-        """Initialise the media player entity."""
+        """Initialise the entity."""
         super().__init__(coordinator)
         self._player_id = player_id
         self._attr_unique_id = player_id
@@ -104,12 +104,12 @@ class YotoMediaPlayerEntity(
 
     @property
     def _player(self) -> YotoPlayer:
-        """Return the current player data from the coordinator."""
+        """Return the current player data."""
         return self.coordinator.data[self._player_id]
 
     @property
     def state(self) -> MediaPlayerState:
-        """Return the current state of the player."""
+        """Return the state."""
         player = self._player
 
         if not player.online:
@@ -119,7 +119,7 @@ class YotoMediaPlayerEntity(
 
     @property
     def volume_level(self) -> float | None:
-        """Return the volume level (0.0 to 1.0)."""
+        """Return the volume level."""
         volume = self._player.volume
         if volume is None:
             return None
@@ -127,11 +127,7 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_title(self) -> str | None:
-        """Return the title of the current media.
-
-        Combines chapter and track titles when they differ, or shows just
-        the chapter title when they match or the track title is absent.
-        """
+        """Return the title of the current media."""
         player = self._player
         chapter = player.chapter_title
         track = player.track_title
@@ -142,17 +138,17 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_duration(self) -> int | None:
-        """Return the duration of the current track in seconds."""
+        """Return the media duration."""
         return self._player.track_length
 
     @property
     def media_position(self) -> int | None:
-        """Return the current playback position in seconds."""
+        """Return the media position."""
         return self._player.track_position
 
     @property
     def _active_card(self) -> Card | None:
-        """Return the library card for the currently playing content."""
+        """Return the active card."""
         card_id = self._player.card_id
         if card_id is None:
             return None
@@ -160,7 +156,7 @@ class YotoMediaPlayerEntity(
 
     @property
     def _active_chapter(self) -> Chapter | None:
-        """Return the chapter for the currently playing content."""
+        """Return the active chapter."""
         card = self._active_card
         if card is None or not card.chapters:
             return None
@@ -171,7 +167,7 @@ class YotoMediaPlayerEntity(
 
     @property
     def _active_track(self) -> Track | None:
-        """Return the track for the currently playing content."""
+        """Return the active track."""
         chapter = self._active_chapter
         if chapter is None or not chapter.tracks:
             return None
@@ -182,7 +178,7 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_image_url(self) -> str | None:
-        """Return the cover image URL of the current card."""
+        """Return the cover image URL."""
         card = self._active_card
         if card is None:
             return None
@@ -190,12 +186,12 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_image_remotely_accessible(self) -> bool:
-        """Return True since Yoto image URLs are publicly accessible."""
+        """Return True."""
         return True
 
     @property
     def media_artist(self) -> str | None:
-        """Return the author of the current card."""
+        """Return the card author."""
         card = self._active_card
         if card is None:
             return None
@@ -203,7 +199,7 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_album_name(self) -> str | None:
-        """Return the title of the current card as the album name."""
+        """Return the album name."""
         card = self._active_card
         if card is None:
             return None
@@ -211,7 +207,7 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_content_id(self) -> str | None:
-        """Return the composite content ID of the current media."""
+        """Return the content ID."""
         player = self._player
         if player.card_id and player.chapter_key and player.track_key:
             return f"{player.card_id}+{player.chapter_key}+{player.track_key}"
@@ -219,14 +215,14 @@ class YotoMediaPlayerEntity(
 
     @property
     def media_content_type(self) -> MediaType | str | None:
-        """Return the content type of the current media."""
+        """Return the content type."""
         if self.media_content_id:
             return MediaType.MUSIC
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes including chapter and track icons."""
+        """Return extra state attributes."""
         attrs: dict[str, Any] = {}
         chapter = self._active_chapter
         if chapter and chapter.icon:
@@ -255,7 +251,7 @@ class YotoMediaPlayerEntity(
         )
 
     async def async_set_volume_level(self, volume: float) -> None:
-        """Set volume level (0.0 to 1.0)."""
+        """Set volume level."""
         yoto_volume = int(volume * 100)
         await self.hass.async_add_executor_job(
             self.coordinator.manager.set_volume, self._player_id, yoto_volume
@@ -264,10 +260,7 @@ class YotoMediaPlayerEntity(
     async def async_play_media(
         self, media_type: MediaType | str, media_id: str, **kwargs: Any
     ) -> None:
-        """Play a card on the player.
-
-        Accepts media IDs in the format: cardid[+chapterKey[+trackKey[+seconds]]].
-        """
+        """Play media."""
         parts = media_id.split("+")
         card_id = parts[0]
         play_kwargs: dict[str, Any] = {}
@@ -288,7 +281,7 @@ class YotoMediaPlayerEntity(
         )
 
     async def async_media_seek(self, position: float) -> None:
-        """Seek to a position in the current track."""
+        """Seek to a position."""
         player = self._player
         await self.hass.async_add_executor_job(
             partial(
@@ -302,7 +295,7 @@ class YotoMediaPlayerEntity(
         )
 
     async def async_media_next_track(self) -> None:
-        """Skip to the next track."""
+        """Skip to next track."""
         player = self._player
         chapter_key = str(int(player.chapter_key) + 1) if player.chapter_key else None
         track_key = str(int(player.track_key) + 1) if player.track_key else None
@@ -317,7 +310,7 @@ class YotoMediaPlayerEntity(
         )
 
     async def async_media_previous_track(self) -> None:
-        """Skip to the previous track."""
+        """Skip to previous track."""
         player = self._player
         chapter_key = str(int(player.chapter_key) - 1) if player.chapter_key else None
         track_key = str(int(player.track_key) - 1) if player.track_key else None
@@ -336,7 +329,7 @@ class YotoMediaPlayerEntity(
         media_content_type: MediaType | str | None = None,
         media_content_id: str | None = None,
     ) -> BrowseMedia:
-        """Browse the Yoto card library."""
+        """Browse the card library."""
         library = self.coordinator.manager.library
 
         if media_content_id is not None and media_content_id != "library":
@@ -374,7 +367,7 @@ class YotoMediaPlayerEntity(
     def _browse_card_chapters(
         self, card_id: str, library: dict[str, Card]
     ) -> BrowseMedia:
-        """Build a browse response for a card's chapters."""
+        """Browse a card's chapters."""
         card = library[card_id]
         children: list[BrowseMedia] = []
 
@@ -406,7 +399,7 @@ class YotoMediaPlayerEntity(
     def _browse_chapter_tracks(
         self, card_id: str, chapter_key: str, library: dict[str, Card]
     ) -> BrowseMedia:
-        """Build a browse response for a chapter's tracks."""
+        """Browse a chapter's tracks."""
         card = library[card_id]
         chapter = card.chapters[chapter_key]
 

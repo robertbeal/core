@@ -1,4 +1,4 @@
-"""Switch platform for the Yoto integration."""
+"""Platform for switch."""
 
 from __future__ import annotations
 
@@ -27,14 +27,14 @@ PARALLEL_UPDATES = 1
 def _set_brightness(
     manager: YotoManager, player_id: str, field: str, value: str
 ) -> None:
-    """Set a display brightness field via the API."""
+    """Set a display brightness field."""
     config = YotoPlayerConfig()
     setattr(config, field, value)
     manager.set_player_config(player_id, config)
 
 
 def _end_of_track_is_on(player: YotoPlayer) -> bool:
-    """Return True when the sleep timer approximately matches the remaining track time."""
+    """Return True when sleep timer matches remaining track time."""
     if (
         player.track_length is None
         or player.track_position is None
@@ -46,7 +46,7 @@ def _end_of_track_is_on(player: YotoPlayer) -> bool:
 
 
 def _end_of_track_turn_on(manager: YotoManager, player: YotoPlayer) -> None:
-    """Set the sleep timer to the remaining track time."""
+    """Set the sleep timer to remaining track time."""
     if player.track_length is not None and player.track_position is not None:
         seconds_to_end = player.track_length - player.track_position
         manager.set_sleep(player.id, seconds_to_end)
@@ -59,7 +59,7 @@ def _end_of_track_turn_off(manager: YotoManager, player: YotoPlayer) -> None:
 
 @dataclass(frozen=True, kw_only=True)
 class YotoSwitchEntityDescription(YotoEntityDescription, SwitchEntityDescription):
-    """Description of a Yoto switch entity."""
+    """Describes a Yoto switch entity."""
 
     is_on_fn: Callable[[YotoPlayer], bool | None]
     turn_on_fn: Callable[[YotoManager, YotoPlayer], None]
@@ -114,14 +114,14 @@ async def async_setup_entry(
     entry: YotoConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Yoto switch entities from a config entry."""
+    """Set up switches."""
     coordinator = entry.runtime_data.coordinator
 
     known_players: set[str] = set()
 
     @callback
     def _async_add_new_players() -> None:
-        """Add switch entities for any newly discovered players."""
+        """Add entities for newly discovered players."""
         current_players = set(coordinator.data)
         new_players = current_players - known_players
         if new_players:
@@ -148,18 +148,9 @@ async def async_setup_entry(
 
 
 class YotoSwitchEntity(YotoEntity, SwitchEntity):
-    """Representation of a Yoto switch entity."""
+    """Yoto switch entity."""
 
     entity_description: YotoSwitchEntityDescription
-
-    def __init__(
-        self,
-        coordinator: YotoDataUpdateCoordinator,
-        player_id: str,
-        description: YotoSwitchEntityDescription,
-    ) -> None:
-        """Initialise the switch entity."""
-        super().__init__(coordinator, player_id, description)
 
     @property
     def is_on(self) -> bool | None:
@@ -184,7 +175,7 @@ class YotoSwitchEntity(YotoEntity, SwitchEntity):
 
 
 class YotoAlarmSwitchEntity(CoordinatorEntity[YotoDataUpdateCoordinator], SwitchEntity):
-    """Representation of a Yoto alarm enable/disable switch."""
+    """Yoto alarm enable/disable switch."""
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
@@ -214,12 +205,12 @@ class YotoAlarmSwitchEntity(CoordinatorEntity[YotoDataUpdateCoordinator], Switch
 
     @property
     def _player(self) -> YotoPlayer:
-        """Return the current player data from the coordinator."""
+        """Return the current player data."""
         return self.coordinator.data[self._player_id]
 
     @property
     def _alarm(self) -> Alarm | None:
-        """Return the alarm for this entity."""
+        """Return the alarm."""
         player = self._player
         if player.config and player.config.alarms:
             if self._alarm_index < len(player.config.alarms):
@@ -243,7 +234,7 @@ class YotoAlarmSwitchEntity(CoordinatorEntity[YotoDataUpdateCoordinator], Switch
         await self._set_alarm_enabled(False)
 
     async def _set_alarm_enabled(self, enabled: bool) -> None:
-        """Enable or disable the alarm via the API."""
+        """Enable or disable the alarm."""
         player = self._player
         if player.config and player.config.alarms:
             config = YotoPlayerConfig()

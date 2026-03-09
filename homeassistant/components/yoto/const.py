@@ -1,4 +1,4 @@
-"""Constants for the Yoto integration."""
+"""Constants for Yoto."""
 
 from datetime import timedelta
 

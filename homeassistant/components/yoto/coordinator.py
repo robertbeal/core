@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for the Yoto integration."""
+"""Yoto coordinator."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
-    """Coordinator to fetch player data from the Yoto API."""
+    """Yoto data update coordinator."""
 
     config_entry: ConfigEntry
 
@@ -45,27 +45,22 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.previous_players: set[str] = set()
 
     async def _async_setup(self) -> None:
-        """Connect to MQTT events for real-time push updates."""
+        """Connect to MQTT push events."""
         await self.hass.async_add_executor_job(
             self.manager.connect_to_events, self._handle_mqtt_event
         )
 
     def _handle_mqtt_event(self) -> None:
-        """Handle an MQTT event from the yoto-api background thread.
-
-        This callback is invoked by paho-mqtt from a background thread,
-        so we must use call_soon_threadsafe to marshal the update onto
-        the event loop.
-        """
+        """Handle an MQTT event."""
         self.hass.loop.call_soon_threadsafe(self._process_mqtt_update)
 
     def _process_mqtt_update(self) -> None:
-        """Process an MQTT update on the event loop."""
+        """Process an MQTT update."""
         self._fetch_missing_card_details()
         self.async_set_updated_data(self.manager.players)
 
     def _fetch_missing_card_details(self) -> None:
-        """Schedule card detail fetches for cards with missing chapter data."""
+        """Fetch missing card details for playing cards."""
         for player in self.manager.players.values():
             card_id = player.card_id
             chapter_key = player.chapter_key
@@ -79,7 +74,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
                 )
 
     async def _async_update_data(self) -> dict[str, YotoPlayer]:
-        """Fetch player data from the Yoto API."""
+        """Fetch data from API."""
         try:
             await self.hass.async_add_executor_job(self.manager.check_and_refresh_token)
             await self.hass.async_add_executor_job(self.manager.update_players_status)
@@ -113,7 +108,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         return self.manager.players
 
     def persist_token_if_changed(self) -> None:
-        """Persist the refresh token to the config entry if it has changed."""
+        """Persist the refresh token if changed."""
         token = self.manager.token.refresh_token
         if token != self.config_entry.data.get(CONF_TOKEN):
             self.hass.config_entries.async_update_entry(

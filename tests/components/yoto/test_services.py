@@ -26,10 +26,9 @@ async def test_update_service_triggers_refresh(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test that calling the update service triggers a coordinator refresh."""
+    """Test update service triggers a coordinator refresh."""
     await _setup(hass, mock_config_entry)
 
-    # Reset mock call counts from initial setup
     mock_yoto_manager.update_players_status.reset_mock()
 
     await hass.services.async_call(
@@ -47,7 +46,7 @@ async def test_update_service_invalid_entry(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test that calling the update service with an invalid entry raises an error."""
+    """Test update service with invalid entry raises an error."""
     await _setup(hass, mock_config_entry)
 
     with pytest.raises(ServiceValidationError) as err:

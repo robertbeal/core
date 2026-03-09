@@ -1,4 +1,4 @@
-"""Base entity for the Yoto integration."""
+"""Base class for entities."""
 
 from __future__ import annotations
 
@@ -48,5 +48,5 @@ class YotoEntity(CoordinatorEntity[YotoDataUpdateCoordinator]):
 
     @property
     def _player(self) -> YotoPlayer:
-        """Return the current player data from the coordinator."""
+        """Return the current player data."""
         return self.coordinator.data[self._player_id]

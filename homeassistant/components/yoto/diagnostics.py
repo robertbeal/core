@@ -1,4 +1,4 @@
-"""Diagnostics support for the Yoto integration."""
+"""Diagnostics for Yoto."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
     config_entry: YotoConfigEntry,
 ) -> dict[str, Any]:
-    """Return diagnostics for a config entry."""
+    """Return diagnostics."""
     coordinator = config_entry.runtime_data.coordinator
 
     players_data = {}

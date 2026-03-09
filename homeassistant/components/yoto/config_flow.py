@@ -1,4 +1,4 @@
-"""Config flow for Yoto integration."""
+"""Config flow for Yoto."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Yoto."""
+    """Yoto config flow."""
 
     _manager: YotoManager
     _auth_data: dict[str, Any]
@@ -36,22 +36,22 @@ class YotoConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(
         config_entry: ConfigEntry,
     ) -> YotoOptionsFlowHandler:
-        """Get the options flow for this handler."""
+        """Get the options flow."""
         return YotoOptionsFlowHandler()
 
     async def _async_wait_for_auth(self) -> None:
-        """Wait for device code auth to complete (runs in background task)."""
+        """Wait for device code auth."""
         await self.hass.async_add_executor_job(self._manager.device_code_flow_complete)
 
     def _start_login_task(self) -> asyncio.Task[None]:
-        """Create and store the login background task."""
+        """Start the login background task."""
         self._login_task = self.hass.async_create_task(self._async_wait_for_auth())
         return self._login_task
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step - initiate device code flow."""
+        """Handle the initial step."""
         if not self._login_task:
             self._manager = await self.hass.async_add_executor_job(
                 YotoManager, CLIENT_ID

@@ -55,7 +55,7 @@ async def test_day_auto_brightness_on(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Day auto brightness should be on when display brightness is 'auto'."""
+    """Test day auto brightness is on when display brightness is auto."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("switch.my_yoto_day_auto_brightness")
@@ -68,7 +68,7 @@ async def test_night_auto_brightness_off(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night auto brightness should be off when display brightness is a number."""
+    """Test night auto brightness is off when display brightness is a number."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("switch.my_yoto_night_auto_brightness")
@@ -81,7 +81,7 @@ async def test_turn_on_sets_auto(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning on should set display brightness to 'auto'."""
+    """Test turning on sets display brightness to auto."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -103,7 +103,7 @@ async def test_turn_off_sets_zero(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning off should set display brightness to '0'."""
+    """Test turning off sets display brightness to zero."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -125,7 +125,7 @@ async def test_switch_entities_are_config_category(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Switch entities should be in the config entity category."""
+    """Test switch entities are in the config category."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     ent_reg = er.async_get(hass)
@@ -139,7 +139,7 @@ async def test_end_of_track_sleep_on(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """End of track sleep should be on when sleep timer matches remaining track time."""
+    """Test end of track sleep is on when timer matches remaining track time."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -159,7 +159,7 @@ async def test_end_of_track_sleep_off(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """End of track sleep should be off when sleep timer does not match."""
+    """Test end of track sleep is off when timer does not match."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -179,7 +179,7 @@ async def test_end_of_track_sleep_turn_on(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning on should set sleep timer to remaining track time."""
+    """Test turning on sets sleep timer to remaining track time."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -204,7 +204,7 @@ async def test_end_of_track_sleep_turn_off(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning off should set sleep timer to 0."""
+    """Test turning off sets sleep timer to zero."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -229,7 +229,7 @@ async def test_alarm_enabled_switch(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Alarm switch should show enabled state."""
+    """Test alarm switch shows enabled state."""
     alarm = Alarm(
         enabled=True,
         time=datetime.time(7, 0),
@@ -258,7 +258,7 @@ async def test_alarm_disabled_switch(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Alarm switch should show disabled state."""
+    """Test alarm switch shows disabled state."""
     alarm = Alarm(enabled=False, time=datetime.time(7, 0))
     await _setup_player(
         hass,
@@ -281,7 +281,7 @@ async def test_multiple_alarm_switches(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Multiple alarms should create numbered switch entities."""
+    """Test multiple alarms create numbered switch entities."""
     alarms = [
         Alarm(enabled=True, time=datetime.time(7, 0)),
         Alarm(enabled=False, time=datetime.time(8, 30)),
@@ -311,7 +311,7 @@ async def test_alarm_turn_on(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning on an alarm switch should enable the alarm via the API."""
+    """Test turning on an alarm switch enables the alarm."""
     alarm = Alarm(enabled=False, time=datetime.time(7, 0))
     await _setup_player(
         hass,
@@ -343,7 +343,7 @@ async def test_alarm_turn_off(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning off an alarm switch should disable the alarm via the API."""
+    """Test turning off an alarm switch disables the alarm."""
     alarm = Alarm(enabled=True, time=datetime.time(7, 0))
     await _setup_player(
         hass,
@@ -375,7 +375,7 @@ async def test_no_alarm_switches_when_no_alarms(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """No alarm switch entities should be created when config has no alarms."""
+    """Test no alarm switches are created when config has no alarms."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("switch.my_yoto_alarm_1")
@@ -387,7 +387,7 @@ async def test_alarm_switch_is_config_category(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Alarm switches should be in the config entity category."""
+    """Test alarm switches are in the config category."""
     alarm = Alarm(enabled=True, time=datetime.time(7, 0))
     await _setup_player(
         hass,

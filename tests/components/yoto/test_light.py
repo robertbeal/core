@@ -59,7 +59,7 @@ async def test_light_on_with_rgb(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Light should be on and report RGB when colour is set."""
+    """Test light on with RGB colour."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("light.my_yoto_day_ambient_colour")
@@ -75,7 +75,7 @@ async def test_light_off_when_colour_is_zero(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Light should be off when the colour value is #0."""
+    """Test light off when colour is #0."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -96,7 +96,7 @@ async def test_night_ambient_colour(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Night ambient colour light should report correct RGB."""
+    """Test the night ambient colour."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("light.my_yoto_night_ambient_colour")
@@ -110,7 +110,7 @@ async def test_turn_on_with_rgb(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning on with RGB should call set_player_config with hex colour."""
+    """Test turning on with RGB colour."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -135,7 +135,7 @@ async def test_turn_on_without_rgb_uses_white(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning on without specifying RGB should default to white."""
+    """Test turning on without RGB defaults to white."""
     await _setup_player(
         hass,
         mock_config_entry,
@@ -163,7 +163,7 @@ async def test_turn_off(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Turning off should call set_player_config with #0."""
+    """Test turning off."""
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(

@@ -19,7 +19,7 @@ async def test_user_flow_initiates_device_code(
     mock_setup_entry: MagicMock,
     mock_yoto_manager_config_flow: MagicMock,
 ) -> None:
-    """Test that starting the user flow initiates device code auth."""
+    """Test user flow initiates device code auth."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -36,14 +36,13 @@ async def test_user_flow_creates_entry_on_success(
     mock_yoto_manager_config_flow: MagicMock,
     device_auth_event: Event,
 ) -> None:
-    """Test that completing device code auth creates a config entry."""
+    """Test user flow creates a config entry on success."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
 
     assert result["type"] is FlowResultType.SHOW_PROGRESS
 
-    # Signal that auth completed successfully
     device_auth_event.set()
     await hass.async_block_till_done()
 
@@ -60,7 +59,7 @@ async def test_user_flow_auth_failure(
     mock_yoto_manager_config_flow: MagicMock,
     device_auth_event: Event,
 ) -> None:
-    """Test that auth failure aborts."""
+    """Test auth failure aborts."""
 
     def mock_complete_with_error() -> None:
         device_auth_event.wait()
@@ -89,7 +88,7 @@ async def test_user_flow_single_instance(
     mock_yoto_manager_config_flow: MagicMock,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """Test that we abort if already configured (single_config_entry)."""
+    """Test single instance abort when already configured."""
     mock_config_entry.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(
@@ -105,7 +104,7 @@ async def test_reauth_flow_success(
     mock_yoto_manager_config_flow: MagicMock,
     device_auth_event: Event,
 ) -> None:
-    """Test that reauth flow updates the token."""
+    """Test reauth flow updates the token."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_TOKEN: "old-refresh-token"},
@@ -132,7 +131,7 @@ async def test_reauth_flow_auth_failure(
     mock_yoto_manager_config_flow: MagicMock,
     device_auth_event: Event,
 ) -> None:
-    """Test that reauth failure aborts with error."""
+    """Test reauth failure aborts with error."""
 
     def mock_complete_with_error() -> None:
         device_auth_event.wait()
@@ -166,7 +165,7 @@ async def test_options_flow_default_scan_interval(
     mock_yoto_manager: MagicMock,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """Test that options flow shows the default scan interval."""
+    """Test options flow shows the default scan interval."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -182,7 +181,7 @@ async def test_options_flow_sets_scan_interval(
     mock_yoto_manager: MagicMock,
     mock_config_entry: MockConfigEntry,
 ) -> None:
-    """Test that options flow saves the scan interval."""
+    """Test options flow saves the scan interval."""
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()

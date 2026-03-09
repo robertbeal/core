@@ -1,4 +1,4 @@
-"""Yoto service actions."""
+"""Yoto services."""
 
 from __future__ import annotations
 
@@ -28,10 +28,10 @@ SERVICE_UPDATE_SCHEMA: Final = vol.Schema(
 
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
-    """Register Yoto service actions."""
+    """Register service actions."""
 
     async def update(call: ServiceCall) -> None:
-        """Force an immediate data refresh."""
+        """Force a data refresh."""
         entry: YotoConfigEntry = service.async_get_config_entry(
             call.hass, DOMAIN, call.data[ATTR_CONFIG_ENTRY]
         )
