@@ -199,6 +199,35 @@ async def test_end_of_track_sleep_turn_on(
     mock_yoto_manager.set_sleep.assert_called_once_with(PLAYER_ID, 120)
 
 
+async def test_end_of_track_sleep_turn_on_persists(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning on optimistically updates entity state to on."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        track_length=180,
+        track_position=60,
+        sleep_timer_seconds_remaining=0,
+    )
+
+    state = hass.states.get("switch.my_yoto_end_of_track_sleep")
+    assert state.state == "off"
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: "switch.my_yoto_end_of_track_sleep"},
+        blocking=True,
+    )
+
+    state = hass.states.get("switch.my_yoto_end_of_track_sleep")
+    assert state.state == "on"
+
+
 async def test_end_of_track_sleep_turn_off(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -222,6 +251,35 @@ async def test_end_of_track_sleep_turn_off(
     )
 
     mock_yoto_manager.set_sleep.assert_called_once_with(PLAYER_ID, 0)
+
+
+async def test_end_of_track_sleep_turn_off_persists(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning off optimistically updates entity state to off."""
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        track_length=180,
+        track_position=60,
+        sleep_timer_seconds_remaining=120,
+    )
+
+    state = hass.states.get("switch.my_yoto_end_of_track_sleep")
+    assert state.state == "on"
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_OFF,
+        {ATTR_ENTITY_ID: "switch.my_yoto_end_of_track_sleep"},
+        blocking=True,
+    )
+
+    state = hass.states.get("switch.my_yoto_end_of_track_sleep")
+    assert state.state == "off"
 
 
 async def test_alarm_enabled_switch(

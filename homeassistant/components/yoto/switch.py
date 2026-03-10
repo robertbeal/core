@@ -54,6 +54,9 @@ async def _end_of_track_turn_on(
         await coordinator.hass.async_add_executor_job(
             coordinator.manager.set_sleep, player.id, seconds_to_end
         )
+        player.sleep_timer_seconds_remaining = seconds_to_end
+        player.sleep_timer_active = True
+        coordinator.async_set_updated_data(coordinator.manager.players)
 
 
 async def _end_of_track_turn_off(
@@ -63,6 +66,9 @@ async def _end_of_track_turn_off(
     await coordinator.hass.async_add_executor_job(
         coordinator.manager.set_sleep, player.id, 0
     )
+    player.sleep_timer_seconds_remaining = 0
+    player.sleep_timer_active = False
+    coordinator.async_set_updated_data(coordinator.manager.players)
 
 
 @dataclass(frozen=True, kw_only=True)
