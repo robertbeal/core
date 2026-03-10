@@ -93,12 +93,16 @@ async def test_night_display_brightness_auto(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test night display brightness reports 100 when set to auto."""
+    """Test night display brightness is unavailable when set to auto.
+
+    When auto brightness is enabled, the manual brightness slider is
+    meaningless and should show as unavailable in the UI.
+    """
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     state = hass.states.get("number.my_yoto_night_display_brightness")
     assert state is not None
-    assert state.state == "100.0"
+    assert state.state == "unavailable"
 
 
 async def test_set_max_volume_limit(
@@ -191,3 +195,56 @@ async def test_set_sleep_timer(
     )
 
     mock_yoto_manager.set_sleep.assert_called_once_with(PLAYER_ID, 300)
+
+
+async def test_day_brightness_unavailable_when_auto(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test day display brightness is unavailable when auto brightness is on.
+
+    When auto brightness is enabled (value is "auto"), the manual
+    brightness slider is meaningless and should show as unavailable.
+    """
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        config=YotoPlayerConfig(
+            day_max_volume_limit=10,
+            night_max_volume_limit=6,
+            day_display_brightness="auto",
+            night_display_brightness="50",
+        ),
+    )
+
+    state = hass.states.get("number.my_yoto_day_display_brightness")
+    assert state is not None
+    assert state.state == "unavailable"
+
+
+async def test_night_brightness_unavailable_when_auto(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test night display brightness is unavailable when auto brightness is on."""
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    state = hass.states.get("number.my_yoto_night_display_brightness")
+    assert state is not None
+    assert state.state == "unavailable"
+
+
+async def test_day_brightness_available_when_manual(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test day display brightness is available when set to a manual value."""
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    state = hass.states.get("number.my_yoto_day_display_brightness")
+    assert state is not None
+    assert state.state == "80.0"

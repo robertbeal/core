@@ -43,6 +43,7 @@ class YotoNumberEntityDescription(YotoEntityDescription, NumberEntityDescription
 
     value_fn: Callable[[YotoPlayer], float | None]
     set_fn: Callable[[YotoDataUpdateCoordinator, str, float], Awaitable[None]]
+    available_fn: Callable[[YotoPlayer], bool] = lambda _: True
 
 
 def _brightness_value(player: YotoPlayer, field: str) -> float | None:
@@ -102,6 +103,9 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         set_fn=lambda coordinator, player_id, value: _set_player_config_field(
             coordinator, player_id, "day_display_brightness", value
         ),
+        available_fn=lambda player: (
+            player.config is not None and player.config.day_display_brightness != "auto"
+        ),
     ),
     YotoNumberEntityDescription(
         key="night_display_brightness",
@@ -114,6 +118,10 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         value_fn=lambda player: _brightness_value(player, "night_display_brightness"),
         set_fn=lambda coordinator, player_id, value: _set_player_config_field(
             coordinator, player_id, "night_display_brightness", value
+        ),
+        available_fn=lambda player: (
+            player.config is not None
+            and player.config.night_display_brightness != "auto"
         ),
     ),
     YotoNumberEntityDescription(
@@ -164,6 +172,11 @@ class YotoNumberEntity(YotoEntity, NumberEntity):
     """Yoto number entity."""
 
     entity_description: YotoNumberEntityDescription
+
+    @property
+    def available(self) -> bool:
+        """Return True if the entity is available."""
+        return super().available and self.entity_description.available_fn(self._player)
 
     @property
     def native_value(self) -> float | None:

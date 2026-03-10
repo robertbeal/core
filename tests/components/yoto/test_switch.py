@@ -462,3 +462,21 @@ async def test_alarm_switch_is_config_category(
     entry = ent_reg.async_get("switch.my_yoto_alarm_1")
     assert entry is not None
     assert entry.entity_category == EntityCategory.CONFIG
+
+
+async def test_end_of_track_sleep_unavailable_when_idle(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test end of track sleep is unavailable when no track is playing.
+
+    When the player is idle, track_length and track_position are None.
+    The switch cannot function without a playing track, so it should
+    report as unavailable rather than silently ignoring toggle actions.
+    """
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    state = hass.states.get("switch.my_yoto_end_of_track_sleep")
+    assert state is not None
+    assert state.state == "unavailable"

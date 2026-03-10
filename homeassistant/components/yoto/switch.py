@@ -78,6 +78,7 @@ class YotoSwitchEntityDescription(YotoEntityDescription, SwitchEntityDescription
     is_on_fn: Callable[[YotoPlayer], bool | None]
     turn_on_fn: Callable[[YotoDataUpdateCoordinator, YotoPlayer], Awaitable[None]]
     turn_off_fn: Callable[[YotoDataUpdateCoordinator, YotoPlayer], Awaitable[None]]
+    available_fn: Callable[[YotoPlayer], bool] = lambda _: True
 
 
 SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
@@ -119,6 +120,9 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
         is_on_fn=_end_of_track_is_on,
         turn_on_fn=_end_of_track_turn_on,
         turn_off_fn=_end_of_track_turn_off,
+        available_fn=lambda player: (
+            player.track_length is not None and player.track_position is not None
+        ),
     ),
 )
 
@@ -165,6 +169,11 @@ class YotoSwitchEntity(YotoEntity, SwitchEntity):
     """Yoto switch entity."""
 
     entity_description: YotoSwitchEntityDescription
+
+    @property
+    def available(self) -> bool:
+        """Return True if the switch is available."""
+        return super().available and self.entity_description.available_fn(self._player)
 
     @property
     def is_on(self) -> bool | None:
