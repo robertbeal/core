@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 from functools import partial
 from typing import Any
 
@@ -145,6 +146,14 @@ class YotoMediaPlayerEntity(
     def media_position(self) -> int | None:
         """Return the media position."""
         return self._player.track_position
+
+    @property
+    def media_position_updated_at(self) -> datetime.datetime | None:
+        """Return when the media position was last updated."""
+        player = self._player
+        if player.track_position is None:
+            return None
+        return player.last_updated_at
 
     @property
     def _active_card(self) -> Card | None:

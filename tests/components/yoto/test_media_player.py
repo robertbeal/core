@@ -1,11 +1,13 @@
 """Tests for the Yoto media_player platform."""
 
+import datetime
 from unittest.mock import MagicMock
 
 from yoto_api import YotoPlayer
 from yoto_api.Card import Card, Chapter, Track
 
 from homeassistant.components.media_player import (
+    ATTR_MEDIA_POSITION_UPDATED_AT,
     DOMAIN as MEDIA_PLAYER_DOMAIN,
     MediaPlayerDeviceClass,
     MediaPlayerState,
@@ -805,3 +807,39 @@ async def test_extra_state_attributes_empty_when_no_library_data(
     state = hass.states.get(ENTITY_ID)
     assert "media_chapter_icon" not in state.attributes
     assert "media_track_icon" not in state.attributes
+
+
+async def test_media_position_updated_at_present_when_playing(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test media_position_updated_at is reported when track position is available."""
+    last_updated = datetime.datetime(2025, 6, 15, 10, 30, 0, tzinfo=datetime.UTC)
+    await _setup_player(
+        hass,
+        mock_config_entry,
+        mock_yoto_manager,
+        track_length=120,
+        track_position=30,
+        last_updated_at=last_updated,
+    )
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.attributes[ATTR_MEDIA_POSITION_UPDATED_AT] is not None
+
+
+async def test_media_position_updated_at_absent_when_idle(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test media_position_updated_at is absent when no track position."""
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert ATTR_MEDIA_POSITION_UPDATED_AT not in state.attributes

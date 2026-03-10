@@ -98,12 +98,50 @@ async def test_turn_on_sets_auto(
     assert config.night_display_brightness == "auto"
 
 
-async def test_turn_off_sets_zero(
+async def test_turn_off_auto_restores_previous_manual_brightness(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test turning off sets display brightness to zero."""
+    """Test turning off auto restores the previous manual brightness value.
+
+    When the user had brightness at 60, enabling then disabling auto
+    should restore 60 rather than setting to 0.
+    """
+    await _setup_player(hass, mock_config_entry, mock_yoto_manager)
+
+    # Night brightness starts at "60" (manual). Turn auto ON first.
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: "switch.my_yoto_night_auto_brightness"},
+        blocking=True,
+    )
+
+    # Now turn auto OFF — should restore "60"
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_OFF,
+        {ATTR_ENTITY_ID: "switch.my_yoto_night_auto_brightness"},
+        blocking=True,
+    )
+
+    call_args = mock_yoto_manager.api.set_player_config.call_args
+    assert call_args.kwargs["player_id"] == PLAYER_ID
+    config = call_args.kwargs["config"]
+    assert config.night_display_brightness == "60"
+
+
+async def test_turn_off_auto_defaults_to_50_when_no_previous_value(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning off auto defaults to 50 when there was no manual value.
+
+    When the player config started as auto (no stored manual value),
+    disabling auto should fall back to 50%.
+    """
     await _setup_player(hass, mock_config_entry, mock_yoto_manager)
 
     await hass.services.async_call(
@@ -113,11 +151,9 @@ async def test_turn_off_sets_zero(
         blocking=True,
     )
 
-    mock_yoto_manager.api.set_player_config.assert_called_once()
     call_args = mock_yoto_manager.api.set_player_config.call_args
-    assert call_args.kwargs["player_id"] == PLAYER_ID
     config = call_args.kwargs["config"]
-    assert config.day_display_brightness == "0"
+    assert config.day_display_brightness == "50"
 
 
 async def test_switch_entities_are_config_category(

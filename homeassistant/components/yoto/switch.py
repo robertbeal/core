@@ -23,11 +23,32 @@ from .entity import YotoEntity, YotoEntityDescription
 
 PARALLEL_UPDATES = 1
 
+_DEFAULT_MANUAL_BRIGHTNESS = "50"
 
-async def _set_brightness(
-    coordinator: YotoDataUpdateCoordinator, player_id: str, field: str, value: str
+# Stores the last manual brightness value per (player_id, field_name)
+# so it can be restored when auto brightness is turned off.
+_last_manual_brightness: dict[tuple[str, str], str] = {}
+
+
+async def _enable_auto_brightness(
+    coordinator: YotoDataUpdateCoordinator, player_id: str, field: str
 ) -> None:
-    """Set a display brightness field."""
+    """Enable auto brightness, saving the current manual value first."""
+    player = coordinator.data[player_id]
+    if player.config is not None:
+        current = getattr(player.config, field)
+        if current is not None and current != "auto":
+            _last_manual_brightness[(player_id, field)] = current
+    config = YotoPlayerConfig()
+    setattr(config, field, "auto")
+    await coordinator.async_set_player_config(player_id, config)
+
+
+async def _disable_auto_brightness(
+    coordinator: YotoDataUpdateCoordinator, player_id: str, field: str
+) -> None:
+    """Disable auto brightness, restoring the previous manual value."""
+    value = _last_manual_brightness.get((player_id, field), _DEFAULT_MANUAL_BRIGHTNESS)
     config = YotoPlayerConfig()
     setattr(config, field, value)
     await coordinator.async_set_player_config(player_id, config)
@@ -91,11 +112,11 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
             if player.config and player.config.day_display_brightness is not None
             else None
         ),
-        turn_on_fn=lambda coordinator, player: _set_brightness(
-            coordinator, player.id, "day_display_brightness", "auto"
+        turn_on_fn=lambda coordinator, player: _enable_auto_brightness(
+            coordinator, player.id, "day_display_brightness"
         ),
-        turn_off_fn=lambda coordinator, player: _set_brightness(
-            coordinator, player.id, "day_display_brightness", "0"
+        turn_off_fn=lambda coordinator, player: _disable_auto_brightness(
+            coordinator, player.id, "day_display_brightness"
         ),
     ),
     YotoSwitchEntityDescription(
@@ -107,11 +128,11 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
             if player.config and player.config.night_display_brightness is not None
             else None
         ),
-        turn_on_fn=lambda coordinator, player: _set_brightness(
-            coordinator, player.id, "night_display_brightness", "auto"
+        turn_on_fn=lambda coordinator, player: _enable_auto_brightness(
+            coordinator, player.id, "night_display_brightness"
         ),
-        turn_off_fn=lambda coordinator, player: _set_brightness(
-            coordinator, player.id, "night_display_brightness", "0"
+        turn_off_fn=lambda coordinator, player: _disable_auto_brightness(
+            coordinator, player.id, "night_display_brightness"
         ),
     ),
     YotoSwitchEntityDescription(
