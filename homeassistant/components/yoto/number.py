@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
-from yoto_api import YotoManager, YotoPlayer, YotoPlayerConfig
+from yoto_api import YotoPlayer, YotoPlayerConfig
 
 from homeassistant.components.number import NumberEntity, NumberEntityDescription
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
@@ -13,23 +13,28 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import YotoConfigEntry
+from .coordinator import YotoDataUpdateCoordinator
 from .entity import YotoEntity, YotoEntityDescription
 
 PARALLEL_UPDATES = 1
 
 
-def _set_player_config_field(
-    manager: YotoManager, player_id: str, field: str, value: float
+async def _set_player_config_field(
+    coordinator: YotoDataUpdateCoordinator, player_id: str, field: str, value: float
 ) -> None:
     """Set a player config field."""
     config = YotoPlayerConfig()
     setattr(config, field, int(value))
-    manager.set_player_config(player_id, config)
+    await coordinator.async_set_player_config(player_id, config)
 
 
-def _set_sleep_timer(manager: YotoManager, player_id: str, value: float) -> None:
+async def _set_sleep_timer(
+    coordinator: YotoDataUpdateCoordinator, player_id: str, value: float
+) -> None:
     """Set the sleep timer."""
-    manager.set_sleep(player_id, int(value))
+    await coordinator.hass.async_add_executor_job(
+        coordinator.manager.set_sleep, player_id, int(value)
+    )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -37,7 +42,7 @@ class YotoNumberEntityDescription(YotoEntityDescription, NumberEntityDescription
     """Describes a Yoto number entity."""
 
     value_fn: Callable[[YotoPlayer], float | None]
-    set_fn: Callable[[YotoManager, str, float], None]
+    set_fn: Callable[[YotoDataUpdateCoordinator, str, float], Awaitable[None]]
 
 
 def _brightness_value(player: YotoPlayer, field: str) -> float | None:
@@ -65,8 +70,8 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
             if player.config and player.config.day_max_volume_limit is not None
             else None
         ),
-        set_fn=lambda manager, player_id, value: _set_player_config_field(
-            manager, player_id, "day_max_volume_limit", value
+        set_fn=lambda coordinator, player_id, value: _set_player_config_field(
+            coordinator, player_id, "day_max_volume_limit", value
         ),
     ),
     YotoNumberEntityDescription(
@@ -81,8 +86,8 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
             if player.config and player.config.night_max_volume_limit is not None
             else None
         ),
-        set_fn=lambda manager, player_id, value: _set_player_config_field(
-            manager, player_id, "night_max_volume_limit", value
+        set_fn=lambda coordinator, player_id, value: _set_player_config_field(
+            coordinator, player_id, "night_max_volume_limit", value
         ),
     ),
     YotoNumberEntityDescription(
@@ -94,8 +99,8 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         native_step=1,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda player: _brightness_value(player, "day_display_brightness"),
-        set_fn=lambda manager, player_id, value: _set_player_config_field(
-            manager, player_id, "day_display_brightness", value
+        set_fn=lambda coordinator, player_id, value: _set_player_config_field(
+            coordinator, player_id, "day_display_brightness", value
         ),
     ),
     YotoNumberEntityDescription(
@@ -107,8 +112,8 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         native_step=1,
         native_unit_of_measurement=PERCENTAGE,
         value_fn=lambda player: _brightness_value(player, "night_display_brightness"),
-        set_fn=lambda manager, player_id, value: _set_player_config_field(
-            manager, player_id, "night_display_brightness", value
+        set_fn=lambda coordinator, player_id, value: _set_player_config_field(
+            coordinator, player_id, "night_display_brightness", value
         ),
     ),
     YotoNumberEntityDescription(
@@ -167,9 +172,8 @@ class YotoNumberEntity(YotoEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the number value."""
-        await self.hass.async_add_executor_job(
-            self.entity_description.set_fn,
-            self.coordinator.manager,
+        await self.entity_description.set_fn(
+            self.coordinator,
             self._player_id,
             value,
         )

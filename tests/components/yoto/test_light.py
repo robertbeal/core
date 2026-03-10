@@ -123,10 +123,10 @@ async def test_turn_on_with_rgb(
         blocking=True,
     )
 
-    mock_yoto_manager.set_player_config.assert_called_once()
-    call_args = mock_yoto_manager.set_player_config.call_args
-    assert call_args[0][0] == PLAYER_ID
-    config = call_args[0][1]
+    mock_yoto_manager.api.set_player_config.assert_called_once()
+    call_args = mock_yoto_manager.api.set_player_config.call_args
+    assert call_args.kwargs["player_id"] == PLAYER_ID
+    config = call_args.kwargs["config"]
     assert config.day_ambient_colour == "#00ff80"
 
 
@@ -153,8 +153,8 @@ async def test_turn_on_without_rgb_uses_white(
         blocking=True,
     )
 
-    call_args = mock_yoto_manager.set_player_config.call_args
-    config = call_args[0][1]
+    call_args = mock_yoto_manager.api.set_player_config.call_args
+    config = call_args.kwargs["config"]
     assert config.day_ambient_colour == "#ffffff"
 
 
@@ -173,6 +173,6 @@ async def test_turn_off(
         blocking=True,
     )
 
-    call_args = mock_yoto_manager.set_player_config.call_args
-    config = call_args[0][1]
+    call_args = mock_yoto_manager.api.set_player_config.call_args
+    config = call_args.kwargs["config"]
     assert config.day_ambient_colour == "#0"

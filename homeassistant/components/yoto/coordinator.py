@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime
 from datetime import timedelta
 import logging
@@ -101,11 +102,9 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         fields from that single response. Each player is updated
         independently so one failure doesn't block the others.
         """
-        api = self.manager.api
-        token = self.manager.token
         players = self.manager.players
 
-        response = api._get_devices(token)  # noqa: SLF001
+        response = self.manager.api._get_devices(self.manager.token)  # noqa: SLF001
         for device in response.get("devices", []):
             device_id = get_child_value(device, "deviceId")
             if not device_id:
@@ -118,42 +117,51 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             players[device_id].device_type = get_child_value(device, "deviceType")
             players[device_id].online = get_child_value(device, "online")
 
-            try:
-                config_response = api._get_device_config(token, device_id)  # noqa: SLF001
-            except Exception as err:
-                _LOGGER.warning(
-                    "Failed to fetch config for player %s: %s: %s",
-                    device_id,
-                    type(err).__name__,
-                    err,
-                )
-                continue
+            self._refresh_single_player(device_id)
 
-            try:
-                self._update_player_status(
-                    player=players[device_id], config_response=config_response
-                )
-            except Exception as err:
-                _LOGGER.warning(
-                    "Failed to update status for player %s: %s: %s",
-                    device_id,
-                    type(err).__name__,
-                    err,
-                )
+    def _refresh_single_player(self, player_id: str) -> None:
+        """Fetch and apply config/status data for a single player.
 
-            try:
-                self._update_player_config(
-                    player=players[device_id], config_response=config_response
-                )
-            except Exception as err:
-                _LOGGER.warning(
-                    "Failed to update config for player %s: %s: %s",
-                    device_id,
-                    type(err).__name__,
-                    err,
-                )
+        Calls the config API for the given player and updates both status
+        and config fields. Each step is wrapped in try/except so one
+        failure does not prevent the other from being applied.
+        """
+        api = self.manager.api
+        token = self.manager.token
+        player = self.manager.players[player_id]
 
-            players[device_id].last_updated_at = datetime.datetime.now(pytz.utc)
+        try:
+            config_response = api._get_device_config(token, player_id)  # noqa: SLF001
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed to fetch config for player %s: %s: %s",
+                player_id,
+                type(err).__name__,
+                err,
+            )
+            return
+
+        try:
+            self._update_player_status(player=player, config_response=config_response)
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed to update status for player %s: %s: %s",
+                player_id,
+                type(err).__name__,
+                err,
+            )
+
+        try:
+            self._update_player_config(player=player, config_response=config_response)
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed to update config for player %s: %s: %s",
+                player_id,
+                type(err).__name__,
+                err,
+            )
+
+        player.last_updated_at = datetime.datetime.now(pytz.utc)
 
     def _update_player_status(
         self, *, player: YotoPlayer, config_response: dict
@@ -352,6 +360,39 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.previous_players = current_players
 
         return self.manager.players
+
+    async def async_set_player_config(
+        self, player_id: str, config: YotoPlayerConfig
+    ) -> None:
+        """Set player config, bypassing the library's buggy status refresh.
+
+        YotoManager.set_player_config() calls update_players_status() after
+        sending the config, which hits a bug in yoto_api where int(None) is
+        called when the temperature field is missing from the API response.
+
+        This method sends the config on the executor, then optimistically
+        applies the sent fields to the local player and notifies HA.
+        Reading back from the API immediately would return stale data since
+        the device hasn't processed the change yet; the next scheduled poll
+        will sync.
+        """
+        await self.hass.async_add_executor_job(
+            self._send_player_config, player_id, config
+        )
+        player = self.manager.players[player_id]
+        if player.config is None:
+            player.config = YotoPlayerConfig()
+        for field in dataclasses.fields(config):
+            value = getattr(config, field.name)
+            if value is not None:
+                setattr(player.config, field.name, value)
+        self.async_set_updated_data(self.manager.players)
+
+    def _send_player_config(self, player_id: str, config: YotoPlayerConfig) -> None:
+        """Send player config to the API (sync, runs on executor)."""
+        self.manager.api.set_player_config(
+            token=self.manager.token, player_id=player_id, config=config
+        )
 
     def persist_token_if_changed(self) -> None:
         """Persist the refresh token if changed."""

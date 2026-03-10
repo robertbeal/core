@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from yoto_api import YotoManager, YotoPlayer, YotoPlayerConfig
+from yoto_api import YotoPlayer, YotoPlayerConfig
 from yoto_api.YotoPlayer import Alarm
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
@@ -24,13 +24,13 @@ from .entity import YotoEntity, YotoEntityDescription
 PARALLEL_UPDATES = 1
 
 
-def _set_brightness(
-    manager: YotoManager, player_id: str, field: str, value: str
+async def _set_brightness(
+    coordinator: YotoDataUpdateCoordinator, player_id: str, field: str, value: str
 ) -> None:
     """Set a display brightness field."""
     config = YotoPlayerConfig()
     setattr(config, field, value)
-    manager.set_player_config(player_id, config)
+    await coordinator.async_set_player_config(player_id, config)
 
 
 def _end_of_track_is_on(player: YotoPlayer) -> bool:
@@ -45,16 +45,24 @@ def _end_of_track_is_on(player: YotoPlayer) -> bool:
     return abs(player.sleep_timer_seconds_remaining - seconds_to_end) <= 5
 
 
-def _end_of_track_turn_on(manager: YotoManager, player: YotoPlayer) -> None:
+async def _end_of_track_turn_on(
+    coordinator: YotoDataUpdateCoordinator, player: YotoPlayer
+) -> None:
     """Set the sleep timer to remaining track time."""
     if player.track_length is not None and player.track_position is not None:
         seconds_to_end = player.track_length - player.track_position
-        manager.set_sleep(player.id, seconds_to_end)
+        await coordinator.hass.async_add_executor_job(
+            coordinator.manager.set_sleep, player.id, seconds_to_end
+        )
 
 
-def _end_of_track_turn_off(manager: YotoManager, player: YotoPlayer) -> None:
+async def _end_of_track_turn_off(
+    coordinator: YotoDataUpdateCoordinator, player: YotoPlayer
+) -> None:
     """Cancel the sleep timer."""
-    manager.set_sleep(player.id, 0)
+    await coordinator.hass.async_add_executor_job(
+        coordinator.manager.set_sleep, player.id, 0
+    )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -62,8 +70,8 @@ class YotoSwitchEntityDescription(YotoEntityDescription, SwitchEntityDescription
     """Describes a Yoto switch entity."""
 
     is_on_fn: Callable[[YotoPlayer], bool | None]
-    turn_on_fn: Callable[[YotoManager, YotoPlayer], None]
-    turn_off_fn: Callable[[YotoManager, YotoPlayer], None]
+    turn_on_fn: Callable[[YotoDataUpdateCoordinator, YotoPlayer], Awaitable[None]]
+    turn_off_fn: Callable[[YotoDataUpdateCoordinator, YotoPlayer], Awaitable[None]]
 
 
 SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
@@ -76,11 +84,11 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
             if player.config and player.config.day_display_brightness is not None
             else None
         ),
-        turn_on_fn=lambda manager, player: _set_brightness(
-            manager, player.id, "day_display_brightness", "auto"
+        turn_on_fn=lambda coordinator, player: _set_brightness(
+            coordinator, player.id, "day_display_brightness", "auto"
         ),
-        turn_off_fn=lambda manager, player: _set_brightness(
-            manager, player.id, "day_display_brightness", "0"
+        turn_off_fn=lambda coordinator, player: _set_brightness(
+            coordinator, player.id, "day_display_brightness", "0"
         ),
     ),
     YotoSwitchEntityDescription(
@@ -92,11 +100,11 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
             if player.config and player.config.night_display_brightness is not None
             else None
         ),
-        turn_on_fn=lambda manager, player: _set_brightness(
-            manager, player.id, "night_display_brightness", "auto"
+        turn_on_fn=lambda coordinator, player: _set_brightness(
+            coordinator, player.id, "night_display_brightness", "auto"
         ),
-        turn_off_fn=lambda manager, player: _set_brightness(
-            manager, player.id, "night_display_brightness", "0"
+        turn_off_fn=lambda coordinator, player: _set_brightness(
+            coordinator, player.id, "night_display_brightness", "0"
         ),
     ),
     YotoSwitchEntityDescription(
@@ -159,19 +167,11 @@ class YotoSwitchEntity(YotoEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
-        await self.hass.async_add_executor_job(
-            self.entity_description.turn_on_fn,
-            self.coordinator.manager,
-            self._player,
-        )
+        await self.entity_description.turn_on_fn(self.coordinator, self._player)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
-        await self.hass.async_add_executor_job(
-            self.entity_description.turn_off_fn,
-            self.coordinator.manager,
-            self._player,
-        )
+        await self.entity_description.turn_off_fn(self.coordinator, self._player)
 
 
 class YotoAlarmSwitchEntity(CoordinatorEntity[YotoDataUpdateCoordinator], SwitchEntity):
@@ -249,8 +249,4 @@ class YotoAlarmSwitchEntity(CoordinatorEntity[YotoDataUpdateCoordinator], Switch
                 for a in player.config.alarms
             ]
             config.alarms[self._alarm_index].enabled = enabled
-            await self.hass.async_add_executor_job(
-                self.coordinator.manager.set_player_config,
-                self._player_id,
-                config,
-            )
+            await self.coordinator.async_set_player_config(self._player_id, config)

@@ -3,7 +3,7 @@
 from threading import Thread
 from unittest.mock import MagicMock
 
-from yoto_api import AuthenticationError, YotoPlayer
+from yoto_api import AuthenticationError, YotoPlayer, YotoPlayerConfig
 from yoto_api.Card import Card, Chapter
 
 from homeassistant.components.media_player import MediaPlayerState
@@ -771,3 +771,57 @@ async def test_coordinator_handles_unparseable_temperature(
     # Other fields should still be populated
     assert player.wifi_strength == -54
     assert player.config is not None
+
+
+async def test_set_player_config_applies_optimistically(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test set_player_config applies changes locally without re-fetching.
+
+    The Yoto API may return stale data immediately after a config change
+    (the device hasn't processed it yet). So set_player_config should
+    optimistically apply the sent config fields to the local player,
+    notify HA of the update, and not read back from the API.
+    """
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response()
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+
+    # Reset call counts after initial setup
+    mock_yoto_manager.api._get_devices.reset_mock()
+    mock_yoto_manager.api._get_device_config.reset_mock()
+
+    config = YotoPlayerConfig(day_ambient_colour="#ff0000")
+    await coordinator.async_set_player_config("player-1", config)
+
+    # Should NOT have re-fetched anything from the API
+    mock_yoto_manager.api._get_devices.assert_not_called()
+    mock_yoto_manager.api._get_device_config.assert_not_called()
+
+    # Should have optimistically applied the config field locally
+    player = coordinator.data["player-1"]
+    assert player.config.day_ambient_colour == "#ff0000"
+    # Unchanged fields should retain their original values
+    assert player.config.night_ambient_colour == "#0"
+    assert player.config.day_max_volume_limit == 10
+
+    # HA entity state should reflect the change
+    state = hass.states.get("light.lounge_yoto_day_ambient_colour")
+    assert state is not None
+    assert state.state == "on"

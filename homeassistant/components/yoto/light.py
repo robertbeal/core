@@ -130,8 +130,7 @@ class YotoLightEntity(YotoEntity, LightEntity):
 
         config = YotoPlayerConfig()
         setattr(config, self.entity_description.config_field, hex_colour)
-        await self.hass.async_add_executor_job(
-            self.coordinator.manager.set_player_config,
+        await self.coordinator.async_set_player_config(
             self._player_id,
             config,
         )
@@ -140,8 +139,7 @@ class YotoLightEntity(YotoEntity, LightEntity):
         """Turn off the light."""
         config = YotoPlayerConfig()
         setattr(config, self.entity_description.config_field, "#0")
-        await self.hass.async_add_executor_job(
-            self.coordinator.manager.set_player_config,
+        await self.coordinator.async_set_player_config(
             self._player_id,
             config,
         )

@@ -103,10 +103,10 @@ async def test_set_day_mode_time(
         blocking=True,
     )
 
-    mock_yoto_manager.set_player_config.assert_called_once()
-    call_args = mock_yoto_manager.set_player_config.call_args
-    assert call_args[0][0] == PLAYER_ID
-    config = call_args[0][1]
+    mock_yoto_manager.api.set_player_config.assert_called_once()
+    call_args = mock_yoto_manager.api.set_player_config.call_args
+    assert call_args.kwargs["player_id"] == PLAYER_ID
+    config = call_args.kwargs["config"]
     assert config.day_mode_time == datetime.time(6, 30)
 
 

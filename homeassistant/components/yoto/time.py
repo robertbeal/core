@@ -88,8 +88,7 @@ class YotoTimeEntity(YotoEntity, TimeEntity):
         """Set the time value."""
         config = YotoPlayerConfig()
         setattr(config, self.entity_description.config_field, value)
-        await self.hass.async_add_executor_job(
-            self.coordinator.manager.set_player_config,
+        await self.coordinator.async_set_player_config(
             self._player_id,
             config,
         )
