@@ -164,6 +164,55 @@ def _make_player(**overrides: object) -> YotoPlayer:
     return YotoPlayer(**{**defaults, **overrides})
 
 
+def _make_config_response(
+    *,
+    status_overrides: dict | None = None,
+    config_overrides: dict | None = None,
+) -> dict:
+    """Build a realistic config API response with embedded status and config.
+
+    The Yoto config endpoint (/device-v2/{id}/config) returns both status
+    and config data under device.status and device.config respectively.
+    Status uses abbreviated field names (e.g. 'als' not
+    'ambientLightSensorReading').
+    """
+    status = {
+        "activeCard": "none",
+        "als": 0,
+        "batteryLevel": 100,
+        "bluetoothHp": 0,
+        "charging": 0,
+        "day": 1,
+        "fwVersion": "v2.17.5",
+        "headphones": 0,
+        "nightlightMode": "0x000000",
+        "playingStatus": 0,
+        "powerSrc": 2,
+        "temp": "0:24",
+        "userVolume": 50,
+        "volume": 50,
+        "wifiStrength": -54,
+    }
+    if status_overrides:
+        status.update(status_overrides)
+
+    config = {
+        "dayTime": "07:00",
+        "dayDisplayBrightness": "auto",
+        "ambientColour": "#ffffff",
+        "maxVolumeLimit": 10,
+        "nightTime": "19:00",
+        "nightAmbientColour": "#0",
+        "nightMaxVolumeLimit": 8,
+        "nightDisplayBrightness": "50",
+        "alarms": [],
+    }
+    if config_overrides:
+        config.update(config_overrides)
+
+    return {"device": {"status": status, "config": config}}
+
+
 async def test_coordinator_defers_mqtt_when_no_players(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -332,16 +381,16 @@ async def test_mqtt_callback_fetches_card_detail_when_chapters_missing(
     mock_yoto_manager.update_card_detail.assert_called_once_with("card-1")
 
 
-async def test_coordinator_tolerates_single_player_status_failure(
+async def test_coordinator_tolerates_status_parse_failure(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test coordinator loads when one player's status API call fails.
+    """Test coordinator loads when one player's status data is corrupt.
 
-    The coordinator fetches each player's status independently. If one
-    player's status call raises, the coordinator should log a warning and
-    continue with the remaining players rather than failing the update.
+    Status and config are both extracted from the config API response.
+    If status parsing raises (e.g. unexpected field format), the config
+    should still be populated.
     """
     mock_yoto_manager.api._get_devices.return_value = {
         "devices": [
@@ -353,10 +402,7 @@ async def test_coordinator_tolerates_single_player_status_failure(
             },
         ]
     }
-    mock_yoto_manager.api._get_device_status.side_effect = TypeError(
-        "int() argument must be a string, a bytes-like object or a real number, "
-        "not 'NoneType'"
-    )
+    # Return config response with corrupt status (missing 'status' key entirely)
     mock_yoto_manager.api._get_device_config.return_value = {
         "device": {
             "config": {
@@ -383,6 +429,9 @@ async def test_coordinator_tolerates_single_player_status_failure(
     assert coordinator.last_update_success is True
     assert "player-1" in coordinator.data
     assert coordinator.data["player-1"].name == "My Yoto"
+    # Status fields are None because device.status was missing
+    assert coordinator.data["player-1"].charging is None
+    # Config should still be populated
     assert coordinator.data["player-1"].config is not None
 
 
@@ -391,10 +440,11 @@ async def test_coordinator_handles_config_failure_for_one_player(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test config failure for one player doesn't block the other.
+    """Test config API failure for one player doesn't block the other.
 
-    Each player's config is fetched independently. If one player's config
-    call fails, the other player should still have its config populated.
+    Both status and config are extracted from the config endpoint. If
+    the config API call fails for one player, that player gets neither
+    status nor config. The other player should still have both.
     """
     mock_yoto_manager.api._get_devices.return_value = {
         "devices": [
@@ -412,42 +462,13 @@ async def test_coordinator_handles_config_failure_for_one_player(
             },
         ]
     }
-    mock_yoto_manager.api._get_device_status.return_value = {
-        "activeCard": "none",
-        "ambientLightSensorReading": 0,
-        "batteryLevelPercentage": 100,
-        "dayMode": False,
-        "firmwareVersion": "v2.17.5",
-        "isBluetoothAudioConnected": False,
-        "isCharging": False,
-        "isAudioDeviceConnected": False,
-        "nightlightMode": "0x000000",
-        "playingSource": 0,
-        "powerSource": 2,
-        "systemVolumePercentage": 50,
-        "temperatureCelcius": "20",
-        "userVolumePercentage": 50,
-        "wifiStrength": -50,
-    }
 
     def config_side_effect(_token, device_id):
         if device_id == "player-1":
             raise ConnectionError("Config API error for player-1")
-        return {
-            "device": {
-                "config": {
-                    "dayTime": "07:00",
-                    "dayDisplayBrightness": "auto",
-                    "ambientColour": "#ffffff",
-                    "maxVolumeLimit": 10,
-                    "nightTime": "19:00",
-                    "nightAmbientColour": "#0",
-                    "nightMaxVolumeLimit": 8,
-                    "nightDisplayBrightness": "50",
-                    "alarms": [],
-                }
-            }
-        }
+        return _make_config_response(
+            status_overrides={"charging": 0, "wifiStrength": -50},
+        )
 
     mock_yoto_manager.api._get_device_config.side_effect = config_side_effect
 
@@ -460,14 +481,14 @@ async def test_coordinator_handles_config_failure_for_one_player(
     coordinator = mock_config_entry.runtime_data.coordinator
     assert coordinator.last_update_success is True
 
-    # Player 1 should have status but no config
+    # Player 1 should exist with basic info only (config API failed)
     assert "player-1" in coordinator.data
-    assert coordinator.data["player-1"].charging is False
+    assert coordinator.data["player-1"].charging is None
     assert coordinator.data["player-1"].config is None
 
     # Player 2 should have both status and config
     player2 = coordinator.data["player-2"]
-    assert player2.charging is False
+    assert player2.charging == 0
     assert player2.config is not None
     assert player2.config.day_max_volume_limit == 10
 
@@ -517,38 +538,20 @@ async def test_coordinator_populates_status_fields_despite_none_temperature(
             },
         ]
     }
-    mock_yoto_manager.api._get_device_status.return_value = {
-        "activeCard": "none",
-        "ambientLightSensorReading": 42,
-        "batteryLevelPercentage": 85,
-        "dayMode": True,
-        "firmwareVersion": "v2.17.5",
-        "isBluetoothAudioConnected": False,
-        "isCharging": True,
-        "isAudioDeviceConnected": False,
-        "nightlightMode": "0x000000",
-        "playingSource": 0,
-        "powerSource": 2,
-        "systemVolumePercentage": 47,
-        "temperatureCelcius": None,
-        "userVolumePercentage": 50,
-        "wifiStrength": -61,
-    }
-    mock_yoto_manager.api._get_device_config.return_value = {
-        "device": {
-            "config": {
-                "dayTime": "07:00",
-                "dayDisplayBrightness": "auto",
-                "ambientColour": "#ffffff",
-                "maxVolumeLimit": 10,
-                "nightTime": "19:00",
-                "nightAmbientColour": "#0",
-                "nightMaxVolumeLimit": 8,
-                "nightDisplayBrightness": "50",
-                "alarms": [],
-            }
-        }
-    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response(
+        status_overrides={
+            "als": 42,
+            "charging": 1,
+            "day": 1,
+            "fwVersion": "v2.17.5",
+            "wifiStrength": -61,
+            "batteryLevel": 85,
+            "temp": None,
+            "volume": 47,
+            "userVolume": 50,
+            "powerSrc": 2,
+        },
+    )
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -559,8 +562,8 @@ async def test_coordinator_populates_status_fields_despite_none_temperature(
     coordinator = mock_config_entry.runtime_data.coordinator
     player = coordinator.data["player-1"]
 
-    assert player.charging is True
-    assert player.day_mode_on is True
+    assert player.charging == 1
+    assert player.day_mode_on == 1
     assert player.wifi_strength == -61
     assert player.ambient_light_sensor_reading == 42
     assert player.firmware_version == "v2.17.5"
@@ -574,10 +577,10 @@ async def test_coordinator_populates_all_players_independently(
     mock_config_entry: MockConfigEntry,
     mock_yoto_manager: MagicMock,
 ) -> None:
-    """Test each player's status is fetched independently.
+    """Test each player is fetched independently.
 
-    When one player's status API call fails, the other player should still
-    have full status data populated.
+    When the config API call fails for one player, the other player should
+    still have full status and config data populated.
     """
     mock_yoto_manager.api._get_devices.return_value = {
         "devices": [
@@ -596,43 +599,24 @@ async def test_coordinator_populates_all_players_independently(
         ]
     }
 
-    def status_side_effect(_token, device_id):
+    def config_side_effect(_token, device_id):
         if device_id == "player-1":
             raise ConnectionError("API error for player-1")
-        return {
-            "activeCard": "none",
-            "ambientLightSensorReading": 10,
-            "batteryLevelPercentage": 90,
-            "dayMode": False,
-            "firmwareVersion": "v2.17.5",
-            "isBluetoothAudioConnected": False,
-            "isCharging": False,
-            "isAudioDeviceConnected": False,
-            "nightlightMode": "0x000000",
-            "playingSource": 0,
-            "powerSource": 2,
-            "systemVolumePercentage": 50,
-            "temperatureCelcius": "22",
-            "userVolumePercentage": 60,
-            "wifiStrength": -50,
-        }
+        return _make_config_response(
+            status_overrides={
+                "als": 10,
+                "batteryLevel": 90,
+                "charging": 0,
+                "day": 0,
+                "fwVersion": "v2.17.5",
+                "temp": "0:22",
+                "userVolume": 60,
+                "volume": 50,
+                "wifiStrength": -50,
+            },
+        )
 
-    mock_yoto_manager.api._get_device_status.side_effect = status_side_effect
-    mock_yoto_manager.api._get_device_config.return_value = {
-        "device": {
-            "config": {
-                "dayTime": "07:00",
-                "dayDisplayBrightness": "auto",
-                "ambientColour": "#ffffff",
-                "maxVolumeLimit": 10,
-                "nightTime": "19:00",
-                "nightAmbientColour": "#0",
-                "nightMaxVolumeLimit": 8,
-                "nightDisplayBrightness": "50",
-                "alarms": [],
-            }
-        }
-    }
+    mock_yoto_manager.api._get_device_config.side_effect = config_side_effect
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -641,16 +625,16 @@ async def test_coordinator_populates_all_players_independently(
     assert mock_config_entry.state is ConfigEntryState.LOADED
 
     coordinator = mock_config_entry.runtime_data.coordinator
-    # Player 1 should exist with basic info only (status failed)
+    # Player 1 should exist with basic info only (config API failed)
     assert "player-1" in coordinator.data
     assert coordinator.data["player-1"].name == "Lounge Yoto"
     assert coordinator.data["player-1"].charging is None  # no status data
 
-    # Player 2 should have full status data
+    # Player 2 should have full status and config data
     player2 = coordinator.data["player-2"]
     assert player2.name == "Bedroom Yoto"
-    assert player2.charging is False
-    assert player2.temperature_celcius == "22"
+    assert player2.charging == 0
+    assert player2.temperature_celcius == 22
     assert player2.wifi_strength == -50
     assert player2.config is not None
 
@@ -687,3 +671,103 @@ async def test_mqtt_callback_skips_card_detail_when_chapter_known(
     await hass.async_block_till_done()
 
     mock_yoto_manager.update_card_detail.assert_not_called()
+
+
+async def test_coordinator_parses_colon_separated_temperature(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test temperature is parsed from the config endpoint's 'X:Y' format.
+
+    The config endpoint returns temp as 'X:Y' where Y is the temperature
+    in Celsius (e.g. '0:24' means 24 degrees).
+    """
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response(
+        status_overrides={"temp": "0:24"},
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    player = coordinator.data["player-1"]
+    assert player.temperature_celcius == 24
+
+
+async def test_coordinator_ignores_zero_temperature(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test temperature of zero is treated as no reading."""
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response(
+        status_overrides={"temp": "0:0"},
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    player = coordinator.data["player-1"]
+    assert player.temperature_celcius is None
+
+
+async def test_coordinator_handles_unparseable_temperature(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test unparseable temperature does not crash the update."""
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response(
+        status_overrides={"temp": "notSupported"},
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    player = coordinator.data["player-1"]
+    assert player.temperature_celcius is None
+    # Other fields should still be populated
+    assert player.wifi_strength == -54
+    assert player.config is not None

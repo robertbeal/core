@@ -91,10 +91,15 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         the API response. This crashes the entire update loop, leaving all
         players with no status data.
 
+        Additionally, the dedicated status endpoint (/device-v2/{id}/status)
+        now returns {"error": ...} for all devices. The config endpoint
+        (/device-v2/{id}/config) returns both status and config data under
+        device.status and device.config respectively.
+
         This method replaces the library's monolithic update by calling the
-        per-device APIs directly and parsing each field with None guards.
-        Each player is updated independently so one failure doesn't block
-        the others.
+        config API once per device and extracting both status and config
+        fields from that single response. Each player is updated
+        independently so one failure doesn't block the others.
         """
         api = self.manager.api
         token = self.manager.token
@@ -114,7 +119,20 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             players[device_id].online = get_child_value(device, "online")
 
             try:
-                self._update_player_status(device_id)
+                config_response = api._get_device_config(token, device_id)  # noqa: SLF001
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to fetch config for player %s: %s: %s",
+                    device_id,
+                    type(err).__name__,
+                    err,
+                )
+                continue
+
+            try:
+                self._update_player_status(
+                    player=players[device_id], config_response=config_response
+                )
             except Exception as err:
                 _LOGGER.warning(
                     "Failed to update status for player %s: %s: %s",
@@ -124,7 +142,9 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
                 )
 
             try:
-                self._update_player_config(device_id)
+                self._update_player_config(
+                    player=players[device_id], config_response=config_response
+                )
             except Exception as err:
                 _LOGGER.warning(
                     "Failed to update config for player %s: %s: %s",
@@ -135,63 +155,84 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
 
             players[device_id].last_updated_at = datetime.datetime.now(pytz.utc)
 
-    def _update_player_status(self, device_id: str) -> None:
-        """Update a single player's status fields from the API."""
-        api = self.manager.api
-        token = self.manager.token
-        player = self.manager.players[device_id]
+    def _update_player_status(
+        self, *, player: YotoPlayer, config_response: dict
+    ) -> None:
+        """Update a single player's status fields from the config API response.
 
-        status = api._get_device_status(token, device_id)  # noqa: SLF001
-
+        The dedicated status endpoint is broken (returns {"error": ...}).
+        Status data is available in the config endpoint response under
+        device.status, using abbreviated field names (e.g. 'als' instead
+        of 'ambientLightSensorReading', 'day' instead of 'dayMode').
+        """
         player.last_updated_api = datetime.datetime.now(pytz.utc)
 
-        active_card = get_child_value(status, "activeCard")
-        player.is_playing = active_card != "none"
+        active_card = get_child_value(config_response, "device.status.activeCard")
+        player.is_playing = active_card is not None and active_card != "none"
         player.active_card = active_card
 
         player.ambient_light_sensor_reading = get_child_value(
-            status, "ambientLightSensorReading"
+            config_response, "device.status.als"
         )
-        player.day_mode_on = get_child_value(status, "dayMode")
-        player.user_volume = get_child_value(status, "userVolumePercentage")
-        player.system_volume = get_child_value(status, "systemVolumePercentage")
+        player.day_mode_on = get_child_value(config_response, "device.status.day")
+        player.user_volume = get_child_value(
+            config_response, "device.status.userVolume"
+        )
+        player.system_volume = get_child_value(config_response, "device.status.volume")
 
         if player.battery_level_percentage is None:
             player.battery_level_percentage = get_child_value(
-                status, "batteryLevelPercentage"
+                config_response, "device.status.batteryLevel"
             )
 
-        temp = get_child_value(status, "temperatureCelcius")
-        if temp is not None and temp != "notSupported":
-            try:
-                if int(temp) != 0:
-                    player.temperature_celcius = temp
-            except ValueError, TypeError:
-                pass
+        temp_raw = get_child_value(config_response, "device.status.temp")
+        if temp_raw is not None:
+            self._parse_temperature(player, temp_raw)
 
         player.bluetooth_audio_connected = get_child_value(
-            status, "isBluetoothAudioConnected"
+            config_response, "device.status.bluetoothHp"
         )
-        player.charging = get_child_value(status, "isCharging")
+        player.charging = get_child_value(config_response, "device.status.charging")
         player.audio_device_connected = get_child_value(
-            status, "isAudioDeviceConnected"
+            config_response, "device.status.headphones"
         )
-        player.firmware_version = get_child_value(status, "firmwareVersion")
-        player.wifi_strength = get_child_value(status, "wifiStrength")
-        player.playing_source = get_child_value(status, "playingSource")
-        player.night_light_mode = get_child_value(status, "nightlightMode")
+        player.firmware_version = get_child_value(
+            config_response, "device.status.fwVersion"
+        )
+        player.wifi_strength = get_child_value(
+            config_response, "device.status.wifiStrength"
+        )
+        player.playing_source = get_child_value(
+            config_response, "device.status.playingStatus"
+        )
+        player.night_light_mode = get_child_value(
+            config_response, "device.status.nightlightMode"
+        )
 
-        power_source = get_child_value(status, "powerSource")
+        power_source = get_child_value(config_response, "device.status.powerSrc")
         player.power_source = POWER_SOURCE.get(power_source)
 
-    def _update_player_config(self, device_id: str) -> None:
+    @staticmethod
+    def _parse_temperature(player: YotoPlayer, temp_raw: str) -> None:
+        """Parse temperature from the config API's abbreviated format.
+
+        The config endpoint returns temp as "X:Y" where Y is the
+        temperature in Celsius (e.g. "0:24" means 24°C).
+        """
+        try:
+            temp_str = str(temp_raw)
+            if ":" in temp_str:
+                temp_str = temp_str.split(":")[1]
+            temp_value = int(temp_str)
+            if temp_value != 0:
+                player.temperature_celcius = temp_value
+        except ValueError, TypeError:
+            pass
+
+    def _update_player_config(
+        self, *, player: YotoPlayer, config_response: dict
+    ) -> None:
         """Update a single player's config fields from the API."""
-        api = self.manager.api
-        token = self.manager.token
-        player = self.manager.players[device_id]
-
-        config_response = api._get_device_config(token, device_id)  # noqa: SLF001
-
         if player.config is None:
             player.config = YotoPlayerConfig()
 
