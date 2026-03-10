@@ -206,6 +206,8 @@ def _make_config_response(
         "nightMaxVolumeLimit": 8,
         "nightDisplayBrightness": "50",
         "alarms": [],
+        "displayDimTimeout": "60",
+        "shutdownTimeout": "3600",
     }
     if config_overrides:
         config.update(config_overrides)
@@ -825,3 +827,33 @@ async def test_set_player_config_applies_optimistically(
     state = hass.states.get("light.lounge_yoto_day_ambient_colour")
     assert state is not None
     assert state.state == "on"
+
+
+async def test_coordinator_parses_display_dim_and_shutdown_timeouts(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator parses displayDimTimeout and shutdownTimeout from config API."""
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response(
+        config_overrides={"displayDimTimeout": "120", "shutdownTimeout": "7200"},
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    player = coordinator.data["player-1"]
+    assert player.config.display_dim_timeout == "120"
+    assert player.config.shutdown_timeout == "7200"

@@ -279,6 +279,13 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         if alarms is not None:
             self._parse_alarms(player, alarms)
 
+        player.config.display_dim_timeout = get_child_value(
+            config_response, "device.config.displayDimTimeout"
+        )
+        player.config.shutdown_timeout = get_child_value(
+            config_response, "device.config.shutdownTimeout"
+        )
+
         player.last_update_config = datetime.datetime.now(pytz.utc)
 
     @staticmethod
@@ -392,6 +399,38 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.manager.api.set_player_config(
             token=self.manager.token, player_id=player_id, config=config
         )
+
+    async def async_set_raw_player_config(
+        self,
+        player_id: str,
+        api_payload: dict[str, str],
+        local_updates: dict[str, str],
+    ) -> None:
+        """Set raw config fields not supported by the yoto_api library.
+
+        Some config fields (e.g. displayDimTimeout, shutdownTimeout) exist
+        in the API but have no corresponding YotoPlayerConfig dataclass
+        fields. This method sends arbitrary config key/value pairs directly
+        to the API and optimistically applies local updates to the player
+        config object using duck-typed attributes.
+
+        api_payload: dict of API field names to string values
+                     (e.g. {"displayDimTimeout": "120"})
+        local_updates: dict of local attribute names to values
+                       (e.g. {"display_dim_timeout": "120"})
+        """
+        await self.hass.async_add_executor_job(
+            self.manager.api._put_device_config,  # noqa: SLF001
+            self.manager.token,
+            player_id,
+            api_payload,
+        )
+        player = self.manager.players[player_id]
+        if player.config is None:
+            player.config = YotoPlayerConfig()
+        for attr, value in local_updates.items():
+            setattr(player.config, attr, value)
+        self.async_set_updated_data(self.manager.players)
 
     def persist_token_if_changed(self) -> None:
         """Persist the refresh token if changed."""

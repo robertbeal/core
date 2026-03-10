@@ -37,6 +37,22 @@ async def _set_sleep_timer(
     )
 
 
+async def _set_raw_config_field(
+    coordinator: YotoDataUpdateCoordinator,
+    player_id: str,
+    api_key: str,
+    local_attr: str,
+    value: float,
+) -> None:
+    """Set a raw config field not supported by the yoto_api library."""
+    str_value = str(int(value))
+    await coordinator.async_set_raw_player_config(
+        player_id,
+        api_payload={api_key: str_value},
+        local_updates={local_attr: str_value},
+    )
+
+
 @dataclass(frozen=True, kw_only=True)
 class YotoNumberEntityDescription(YotoEntityDescription, NumberEntityDescription):
     """Describes a Yoto number entity."""
@@ -122,6 +138,42 @@ NUMBERS: tuple[YotoNumberEntityDescription, ...] = (
         available_fn=lambda player: (
             player.config is not None
             and player.config.night_display_brightness != "auto"
+        ),
+    ),
+    YotoNumberEntityDescription(
+        key="display_dim_timeout",
+        translation_key="display_dim_timeout",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=3600,
+        native_step=1,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda player: (
+            float(player.config.display_dim_timeout)
+            if player.config
+            and getattr(player.config, "display_dim_timeout", None) is not None
+            else None
+        ),
+        set_fn=lambda coordinator, player_id, value: _set_raw_config_field(
+            coordinator, player_id, "displayDimTimeout", "display_dim_timeout", value
+        ),
+    ),
+    YotoNumberEntityDescription(
+        key="shutdown_timeout",
+        translation_key="shutdown_timeout",
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=0,
+        native_max_value=86400,
+        native_step=1,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda player: (
+            float(player.config.shutdown_timeout)
+            if player.config
+            and getattr(player.config, "shutdown_timeout", None) is not None
+            else None
+        ),
+        set_fn=lambda coordinator, player_id, value: _set_raw_config_field(
+            coordinator, player_id, "shutdownTimeout", "shutdown_timeout", value
         ),
     ),
     YotoNumberEntityDescription(

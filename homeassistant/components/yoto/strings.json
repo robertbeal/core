@@ -76,6 +76,12 @@
       },
       "sleep_timer": {
         "name": "Sleep timer"
+      },
+      "display_dim_timeout": {
+        "name": "Display dim timeout"
+      },
+      "shutdown_timeout": {
+        "name": "Auto power off timeout"
       }
     },
     "sensor": {
