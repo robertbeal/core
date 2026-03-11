@@ -225,6 +225,16 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         power_source = get_child_value(config_response, "device.status.powerSrc")
         player.power_source = POWER_SOURCE.get(power_source)
 
+        player.free_disk_space = get_child_value(
+            config_response, "device.status.freeDisk"
+        )
+        player.total_disk_space = get_child_value(
+            config_response, "device.status.totalDisk"
+        )
+        player.download_speed = get_child_value(
+            config_response, "device.status.bytesPS"
+        )
+
     @staticmethod
     def _parse_temperature(player: YotoPlayer, temp_raw: str) -> None:
         """Parse temperature from the config API's abbreviated format.

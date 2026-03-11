@@ -18,6 +18,8 @@ from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
+    UnitOfDataRate,
+    UnitOfInformation,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
@@ -95,6 +97,33 @@ SENSORS: tuple[YotoSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
         value_fn=lambda player: player.battery_temperature,
     ),
+    YotoSensorEntityDescription(
+        key="free_disk_space",
+        translation_key="free_disk_space",
+        device_class=SensorDeviceClass.DATA_SIZE,
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        suggested_unit_of_measurement=UnitOfInformation.MEGABYTES,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda player: getattr(player, "free_disk_space", None),
+    ),
+    YotoSensorEntityDescription(
+        key="total_disk_space",
+        translation_key="total_disk_space",
+        device_class=SensorDeviceClass.DATA_SIZE,
+        native_unit_of_measurement=UnitOfInformation.BYTES,
+        suggested_unit_of_measurement=UnitOfInformation.MEGABYTES,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda player: getattr(player, "total_disk_space", None),
+    ),
+    YotoSensorEntityDescription(
+        key="download_speed",
+        translation_key="download_speed",
+        device_class=SensorDeviceClass.DATA_RATE,
+        native_unit_of_measurement=UnitOfDataRate.BYTES_PER_SECOND,
+        suggested_unit_of_measurement=UnitOfDataRate.MEGABYTES_PER_SECOND,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda player: getattr(player, "download_speed", None),
+    ),
 )
 
 
@@ -105,7 +134,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensors."""
     coordinator = entry.runtime_data.coordinator
-
     known_players: set[str] = set()
 
     @callback

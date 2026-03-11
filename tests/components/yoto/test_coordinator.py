@@ -193,6 +193,9 @@ def _make_config_response(
         "userVolume": 50,
         "volume": 50,
         "wifiStrength": -54,
+        "freeDisk": 30219824,
+        "totalDisk": 31385600,
+        "bytesPS": 0,
     }
     if status_overrides:
         status.update(status_overrides)

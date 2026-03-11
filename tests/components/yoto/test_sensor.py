@@ -14,6 +14,8 @@ from homeassistant.const import (
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
+    UnitOfDataRate,
+    UnitOfInformation,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
@@ -222,3 +224,84 @@ async def test_niche_sensors_disabled_by_default(
         assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION, (
             f"{entity_id} should be disabled by default"
         )
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_free_disk_space_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test the free disk space sensor displays in megabytes."""
+    player = _make_player()
+    player.free_disk_space = 30250544
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.my_yoto_free_disk_space")
+    assert state is not None
+    assert float(state.state) == pytest.approx(30.250544, rel=1e-3)
+    assert state.attributes[ATTR_DEVICE_CLASS] == SensorDeviceClass.DATA_SIZE
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfInformation.MEGABYTES
+
+    entry = entity_registry.async_get("sensor.my_yoto_free_disk_space")
+    assert entry is not None
+    assert entry.entity_category is None
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_total_disk_space_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test the total disk space sensor displays in megabytes."""
+    player = _make_player()
+    player.total_disk_space = 31385600
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.my_yoto_total_disk_space")
+    assert state is not None
+    assert float(state.state) == pytest.approx(31.3856, rel=1e-3)
+    assert state.attributes[ATTR_DEVICE_CLASS] == SensorDeviceClass.DATA_SIZE
+    assert state.attributes[ATTR_UNIT_OF_MEASUREMENT] == UnitOfInformation.MEGABYTES
+
+    entry = entity_registry.async_get("sensor.my_yoto_total_disk_space")
+    assert entry is not None
+    assert entry.entity_category is None
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_download_speed_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test the download speed sensor displays in megabytes per second."""
+    player = _make_player()
+    player.download_speed = 524288
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.my_yoto_download_speed")
+    assert state is not None
+    assert float(state.state) == pytest.approx(0.524288, rel=1e-3)
+    assert state.attributes[ATTR_DEVICE_CLASS] == SensorDeviceClass.DATA_RATE
+    assert (
+        state.attributes[ATTR_UNIT_OF_MEASUREMENT]
+        == UnitOfDataRate.MEGABYTES_PER_SECOND
+    )
+
+    entry = entity_registry.async_get("sensor.my_yoto_download_speed")
+    assert entry is not None
+    assert entry.entity_category is None

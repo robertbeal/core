@@ -123,6 +123,15 @@
       },
       "battery_temperature": {
         "name": "Battery temperature"
+      },
+      "free_disk_space": {
+        "name": "Free disk space"
+      },
+      "total_disk_space": {
+        "name": "Total disk space"
+      },
+      "download_speed": {
+        "name": "Download speed"
       }
     },
     "switch": {
