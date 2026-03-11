@@ -92,6 +92,36 @@ async def _end_of_track_turn_off(
     coordinator.async_set_updated_data(coordinator.manager.players)
 
 
+async def _set_raw_config_bool(
+    coordinator: YotoDataUpdateCoordinator,
+    player_id: str,
+    api_key: str,
+    local_attr: str,
+    value: bool,
+) -> None:
+    """Set a boolean raw config field not supported by the yoto_api library."""
+    await coordinator.async_set_raw_player_config(
+        player_id,
+        api_payload={api_key: value},
+        local_updates={local_attr: value},
+    )
+
+
+async def _set_raw_config_str(
+    coordinator: YotoDataUpdateCoordinator,
+    player_id: str,
+    api_key: str,
+    local_attr: str,
+    value: str,
+) -> None:
+    """Set a string raw config field not supported by the yoto_api library."""
+    await coordinator.async_set_raw_player_config(
+        player_id,
+        api_payload={api_key: value},
+        local_updates={local_attr: value},
+    )
+
+
 @dataclass(frozen=True, kw_only=True)
 class YotoSwitchEntityDescription(YotoEntityDescription, SwitchEntityDescription):
     """Describes a Yoto switch entity."""
@@ -143,6 +173,68 @@ SWITCHES: tuple[YotoSwitchEntityDescription, ...] = (
         turn_off_fn=_end_of_track_turn_off,
         available_fn=lambda player: (
             player.track_length is not None and player.track_position is not None
+        ),
+    ),
+    YotoSwitchEntityDescription(
+        key="hour_format",
+        translation_key="hour_format",
+        entity_category=EntityCategory.CONFIG,
+        is_on_fn=lambda player: (
+            getattr(player.config, "hour_format", None) == "24"
+            if player.config and getattr(player.config, "hour_format", None) is not None
+            else None
+        ),
+        turn_on_fn=lambda coordinator, player: _set_raw_config_str(
+            coordinator, player.id, "hourFormat", "hour_format", "24"
+        ),
+        turn_off_fn=lambda coordinator, player: _set_raw_config_str(
+            coordinator, player.id, "hourFormat", "hour_format", "12"
+        ),
+    ),
+    YotoSwitchEntityDescription(
+        key="bt_headphones_enabled",
+        translation_key="bt_headphones_enabled",
+        entity_category=EntityCategory.CONFIG,
+        is_on_fn=lambda player: (
+            getattr(player.config, "bt_headphones_enabled", None)
+            if player.config
+            and getattr(player.config, "bt_headphones_enabled", None) is not None
+            else None
+        ),
+        turn_on_fn=lambda coordinator, player: _set_raw_config_bool(
+            coordinator, player.id, "btHeadphonesEnabled", "bt_headphones_enabled", True
+        ),
+        turn_off_fn=lambda coordinator, player: _set_raw_config_bool(
+            coordinator,
+            player.id,
+            "btHeadphonesEnabled",
+            "bt_headphones_enabled",
+            False,
+        ),
+    ),
+    YotoSwitchEntityDescription(
+        key="headphones_volume_limited",
+        translation_key="headphones_volume_limited",
+        entity_category=EntityCategory.CONFIG,
+        is_on_fn=lambda player: (
+            getattr(player.config, "headphones_volume_limited", None)
+            if player.config
+            and getattr(player.config, "headphones_volume_limited", None) is not None
+            else None
+        ),
+        turn_on_fn=lambda coordinator, player: _set_raw_config_bool(
+            coordinator,
+            player.id,
+            "headphonesVolumeLimited",
+            "headphones_volume_limited",
+            True,
+        ),
+        turn_off_fn=lambda coordinator, player: _set_raw_config_bool(
+            coordinator,
+            player.id,
+            "headphonesVolumeLimited",
+            "headphones_volume_limited",
+            False,
         ),
     ),
 )

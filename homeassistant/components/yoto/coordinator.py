@@ -7,6 +7,7 @@ import datetime
 from datetime import timedelta
 import json
 import logging
+from typing import Any
 
 import pytz
 import requests
@@ -291,6 +292,16 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             config_response, "device.config.shutdownTimeout"
         )
 
+        player.config.hour_format = get_child_value(
+            config_response, "device.config.hourFormat"
+        )
+        player.config.bt_headphones_enabled = get_child_value(
+            config_response, "device.config.btHeadphonesEnabled"
+        )
+        player.config.headphones_volume_limited = get_child_value(
+            config_response, "device.config.headphonesVolumeLimited"
+        )
+
         player.last_update_config = datetime.datetime.now(pytz.utc)
 
     @staticmethod
@@ -423,8 +434,8 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
     async def async_set_raw_player_config(
         self,
         player_id: str,
-        api_payload: dict[str, str],
-        local_updates: dict[str, str],
+        api_payload: dict[str, Any],
+        local_updates: dict[str, Any],
     ) -> None:
         """Set raw config fields not supported by the yoto_api library.
 
@@ -434,7 +445,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         to the API and optimistically applies local updates to the player
         config object using duck-typed attributes.
 
-        api_payload: dict of API field names to string values
+        api_payload: dict of API field names to values
                      (e.g. {"displayDimTimeout": "120"})
         local_updates: dict of local attribute names to values
                        (e.g. {"display_dim_timeout": "120"})
@@ -450,7 +461,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.async_set_updated_data(self.manager.players)
 
     def _send_raw_player_config(
-        self, player_id: str, api_payload: dict[str, str]
+        self, player_id: str, api_payload: dict[str, Any]
     ) -> None:
         """Send raw config fields to the API (sync, runs on executor).
 

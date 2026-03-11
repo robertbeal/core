@@ -209,6 +209,9 @@ def _make_config_response(
         "alarms": [],
         "displayDimTimeout": "60",
         "shutdownTimeout": "3600",
+        "hourFormat": "12",
+        "btHeadphonesEnabled": False,
+        "headphonesVolumeLimited": False,
     }
     if config_overrides:
         config.update(config_overrides)

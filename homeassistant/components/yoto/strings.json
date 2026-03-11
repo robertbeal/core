@@ -137,6 +137,15 @@
       },
       "alarm": {
         "name": "Alarm {number}"
+      },
+      "hour_format": {
+        "name": "24-hour clock"
+      },
+      "bt_headphones_enabled": {
+        "name": "Bluetooth pairing"
+      },
+      "headphones_volume_limited": {
+        "name": "Headphone volume limit"
       }
     },
     "time": {

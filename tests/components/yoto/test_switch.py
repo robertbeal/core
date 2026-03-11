@@ -1,7 +1,8 @@
 """Tests for the Yoto switch platform."""
 
 import datetime
-from unittest.mock import MagicMock
+import json
+from unittest.mock import MagicMock, patch
 
 from yoto_api import YotoPlayer, YotoPlayerConfig
 from yoto_api.YotoPlayer import Alarm
@@ -516,3 +517,306 @@ async def test_end_of_track_sleep_unavailable_when_idle(
     state = hass.states.get("switch.my_yoto_end_of_track_sleep")
     assert state is not None
     assert state.state == "unavailable"
+
+
+# --- 24-hour clock switch ---
+
+
+async def test_24_hour_clock_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test 24-hour clock is on when hourFormat is '24'."""
+    player = _make_player()
+    player.config.hour_format = "24"
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.my_yoto_24_hour_clock")
+    assert state is not None
+    assert state.state == "on"
+
+
+async def test_24_hour_clock_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test 24-hour clock is off when hourFormat is '12'."""
+    player = _make_player()
+    player.config.hour_format = "12"
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.my_yoto_24_hour_clock")
+    assert state is not None
+    assert state.state == "off"
+
+
+async def test_24_hour_clock_turn_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning on sends hourFormat '24' via raw config."""
+    player = _make_player()
+    player.config.hour_format = "12"
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_yoto_manager.api.BASE_URL = "https://api.yotoplay.com"
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch("homeassistant.components.yoto.coordinator.requests.put") as mock_put:
+        mock_put.return_value.json.return_value = {}
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_ON,
+            {ATTR_ENTITY_ID: "switch.my_yoto_24_hour_clock"},
+            blocking=True,
+        )
+
+    body = json.loads(mock_put.call_args[1]["data"])
+    assert body == {"deviceId": PLAYER_ID, "config": {"hourFormat": "24"}}
+
+    state = hass.states.get("switch.my_yoto_24_hour_clock")
+    assert state.state == "on"
+
+
+async def test_24_hour_clock_turn_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning off sends hourFormat '12' via raw config."""
+    player = _make_player()
+    player.config.hour_format = "24"
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_yoto_manager.api.BASE_URL = "https://api.yotoplay.com"
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch("homeassistant.components.yoto.coordinator.requests.put") as mock_put:
+        mock_put.return_value.json.return_value = {}
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: "switch.my_yoto_24_hour_clock"},
+            blocking=True,
+        )
+
+    body = json.loads(mock_put.call_args[1]["data"])
+    assert body == {"deviceId": PLAYER_ID, "config": {"hourFormat": "12"}}
+
+    state = hass.states.get("switch.my_yoto_24_hour_clock")
+    assert state.state == "off"
+
+
+# --- Bluetooth pairing switch ---
+
+
+async def test_bluetooth_pairing_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test Bluetooth pairing is on when btHeadphonesEnabled is True."""
+    player = _make_player()
+    player.config.bt_headphones_enabled = True
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.my_yoto_bluetooth_pairing")
+    assert state is not None
+    assert state.state == "on"
+
+
+async def test_bluetooth_pairing_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test Bluetooth pairing is off when btHeadphonesEnabled is False."""
+    player = _make_player()
+    player.config.bt_headphones_enabled = False
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.my_yoto_bluetooth_pairing")
+    assert state is not None
+    assert state.state == "off"
+
+
+async def test_bluetooth_pairing_turn_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning on sends btHeadphonesEnabled true via raw config."""
+    player = _make_player()
+    player.config.bt_headphones_enabled = False
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_yoto_manager.api.BASE_URL = "https://api.yotoplay.com"
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch("homeassistant.components.yoto.coordinator.requests.put") as mock_put:
+        mock_put.return_value.json.return_value = {}
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_ON,
+            {ATTR_ENTITY_ID: "switch.my_yoto_bluetooth_pairing"},
+            blocking=True,
+        )
+
+    body = json.loads(mock_put.call_args[1]["data"])
+    assert body == {"deviceId": PLAYER_ID, "config": {"btHeadphonesEnabled": True}}
+
+    state = hass.states.get("switch.my_yoto_bluetooth_pairing")
+    assert state.state == "on"
+
+
+async def test_bluetooth_pairing_turn_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning off sends btHeadphonesEnabled false via raw config."""
+    player = _make_player()
+    player.config.bt_headphones_enabled = True
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_yoto_manager.api.BASE_URL = "https://api.yotoplay.com"
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch("homeassistant.components.yoto.coordinator.requests.put") as mock_put:
+        mock_put.return_value.json.return_value = {}
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: "switch.my_yoto_bluetooth_pairing"},
+            blocking=True,
+        )
+
+    body = json.loads(mock_put.call_args[1]["data"])
+    assert body == {"deviceId": PLAYER_ID, "config": {"btHeadphonesEnabled": False}}
+
+    state = hass.states.get("switch.my_yoto_bluetooth_pairing")
+    assert state.state == "off"
+
+
+# --- Headphone volume limit switch ---
+
+
+async def test_headphone_volume_limit_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test headphone volume limit is on when headphonesVolumeLimited is True."""
+    player = _make_player()
+    player.config.headphones_volume_limited = True
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.my_yoto_headphone_volume_limit")
+    assert state is not None
+    assert state.state == "on"
+
+
+async def test_headphone_volume_limit_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test headphone volume limit is off when headphonesVolumeLimited is False."""
+    player = _make_player()
+    player.config.headphones_volume_limited = False
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.my_yoto_headphone_volume_limit")
+    assert state is not None
+    assert state.state == "off"
+
+
+async def test_headphone_volume_limit_turn_on(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning on sends headphonesVolumeLimited true via raw config."""
+    player = _make_player()
+    player.config.headphones_volume_limited = False
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_yoto_manager.api.BASE_URL = "https://api.yotoplay.com"
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch("homeassistant.components.yoto.coordinator.requests.put") as mock_put:
+        mock_put.return_value.json.return_value = {}
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_ON,
+            {ATTR_ENTITY_ID: "switch.my_yoto_headphone_volume_limit"},
+            blocking=True,
+        )
+
+    body = json.loads(mock_put.call_args[1]["data"])
+    assert body == {
+        "deviceId": PLAYER_ID,
+        "config": {"headphonesVolumeLimited": True},
+    }
+
+    state = hass.states.get("switch.my_yoto_headphone_volume_limit")
+    assert state.state == "on"
+
+
+async def test_headphone_volume_limit_turn_off(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test turning off sends headphonesVolumeLimited false via raw config."""
+    player = _make_player()
+    player.config.headphones_volume_limited = True
+    mock_yoto_manager.players = {PLAYER_ID: player}
+    mock_yoto_manager.api.BASE_URL = "https://api.yotoplay.com"
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch("homeassistant.components.yoto.coordinator.requests.put") as mock_put:
+        mock_put.return_value.json.return_value = {}
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: "switch.my_yoto_headphone_volume_limit"},
+            blocking=True,
+        )
+
+    body = json.loads(mock_put.call_args[1]["data"])
+    assert body == {
+        "deviceId": PLAYER_ID,
+        "config": {"headphonesVolumeLimited": False},
+    }
+
+    state = hass.states.get("switch.my_yoto_headphone_volume_limit")
+    assert state.state == "off"
