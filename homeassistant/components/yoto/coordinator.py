@@ -5,9 +5,11 @@ from __future__ import annotations
 import dataclasses
 import datetime
 from datetime import timedelta
+import json
 import logging
 
 import pytz
+import requests
 from yoto_api import AuthenticationError, YotoManager, YotoPlayer
 from yoto_api.const import POWER_SOURCE
 from yoto_api.utils import get_child_value
@@ -420,10 +422,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
                        (e.g. {"display_dim_timeout": "120"})
         """
         await self.hass.async_add_executor_job(
-            self.manager.api._put_device_config,  # noqa: SLF001
-            self.manager.token,
-            player_id,
-            api_payload,
+            self._send_raw_player_config, player_id, api_payload
         )
         player = self.manager.players[player_id]
         if player.config is None:
@@ -431,6 +430,21 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         for attr, value in local_updates.items():
             setattr(player.config, attr, value)
         self.async_set_updated_data(self.manager.players)
+
+    def _send_raw_player_config(
+        self, player_id: str, api_payload: dict[str, str]
+    ) -> None:
+        """Send raw config fields to the API (sync, runs on executor).
+
+        Replicates the PUT logic from YotoAPI.set_player_config() for
+        fields that the library doesn't know about.
+        """
+        api = self.manager.api
+        token = self.manager.token
+        url = f"{api.BASE_URL}/device-v2/{player_id}/config"
+        headers = api._get_authenticated_headers(token)  # noqa: SLF001
+        data = json.dumps({"deviceId": player_id, "config": api_payload})
+        requests.put(url, headers=headers, data=data)
 
     def persist_token_if_changed(self) -> None:
         """Persist the refresh token if changed."""

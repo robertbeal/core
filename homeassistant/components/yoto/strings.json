@@ -76,12 +76,30 @@
       },
       "sleep_timer": {
         "name": "Sleep timer"
-      },
+      }
+    },
+    "select": {
       "display_dim_timeout": {
-        "name": "Display dim timeout"
+        "name": "Battery saver",
+        "state": {
+          "0": "Off",
+          "15": "15 seconds",
+          "30": "30 seconds",
+          "60": "1 minute",
+          "180": "3 minutes",
+          "300": "5 minutes"
+        }
       },
       "shutdown_timeout": {
-        "name": "Auto power off timeout"
+        "name": "Auto power off",
+        "state": {
+          "0": "Off",
+          "900": "15 minutes",
+          "1800": "30 minutes",
+          "3600": "1 hour",
+          "7200": "2 hours",
+          "10800": "3 hours"
+        }
       }
     },
     "sensor": {
