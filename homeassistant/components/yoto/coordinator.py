@@ -1,3 +1,5 @@
+"""Data update coordinator for the Yoto integration."""
+
 from __future__ import annotations
 
 import dataclasses

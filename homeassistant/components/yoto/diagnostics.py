@@ -1,3 +1,5 @@
+"""Diagnostics support for the Yoto integration."""
+
 from __future__ import annotations
 
 from typing import Any
