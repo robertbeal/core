@@ -168,6 +168,7 @@ def _make_config_response(
     *,
     status_overrides: dict | None = None,
     config_overrides: dict | None = None,
+    device_overrides: dict | None = None,
 ) -> dict:
     """Build a realistic config API response with embedded status and config.
 
@@ -212,7 +213,16 @@ def _make_config_response(
     if config_overrides:
         config.update(config_overrides)
 
-    return {"device": {"status": status, "config": config}}
+    device = {
+        "mac": "b4:8a:0a:92:7a:f4",
+        "registrationCode": "IBSKCAAA",
+        "status": status,
+        "config": config,
+    }
+    if device_overrides:
+        device.update(device_overrides)
+
+    return {"device": device}
 
 
 async def test_coordinator_defers_mqtt_when_no_players(
@@ -857,3 +867,61 @@ async def test_coordinator_parses_display_dim_and_shutdown_timeouts(
     player = coordinator.data["player-1"]
     assert player.config.display_dim_timeout == "120"
     assert player.config.shutdown_timeout == "7200"
+
+
+async def test_coordinator_parses_mac_and_registration_code(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator parses mac and registrationCode from config API response."""
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response()
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    player = coordinator.data["player-1"]
+    assert player.mac == "b4:8a:0a:92:7a:f4"
+    assert player.registration_code == "IBSKCAAA"
+
+
+async def test_coordinator_handles_missing_mac_and_registration_code(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator handles missing mac and registrationCode gracefully."""
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response(
+        device_overrides={"mac": None, "registrationCode": None},
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    player = coordinator.data["player-1"]
+    assert player.mac is None
+    assert player.registration_code is None

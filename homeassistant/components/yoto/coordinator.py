@@ -1,5 +1,3 @@
-"""Yoto coordinator."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -21,6 +19,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -162,6 +161,8 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
                 err,
             )
 
+        self._update_player_device_info(player=player, config_response=config_response)
+
         player.last_updated_at = datetime.datetime.now(pytz.utc)
 
     def _update_player_status(
@@ -289,6 +290,21 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         )
 
         player.last_update_config = datetime.datetime.now(pytz.utc)
+
+    @staticmethod
+    def _update_player_device_info(
+        *, player: YotoPlayer, config_response: dict
+    ) -> None:
+        """Extract device-level fields from the config API response.
+
+        The config endpoint returns device.mac and device.registrationCode
+        at the top level of the device object. The yoto_api library has no
+        fields for these, so they are duck-typed onto the player object.
+        """
+        player.mac = get_child_value(config_response, "device.mac")
+        player.registration_code = get_child_value(
+            config_response, "device.registrationCode"
+        )
 
     @staticmethod
     def _parse_alarms(player: YotoPlayer, alarms: list[str]) -> None:

@@ -150,3 +150,45 @@ async def test_remove_config_entry_device_blocks_active_device(
         hass, mock_config_entry, device_entry
     )
     assert result is False
+
+
+async def test_device_info_includes_mac_and_serial_number(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    device_registry: dr.DeviceRegistry,
+) -> None:
+    """Test device info includes MAC address in connections and registration code as serial."""
+    player = _make_player()
+    player.mac = "b4:8a:0a:92:7a:f4"
+    player.registration_code = "IBSKCAAA"
+    mock_yoto_manager.players = {PLAYER_ID: player}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = device_registry.async_get_device(identifiers={("yoto", PLAYER_ID)})
+    assert device is not None
+    assert (dr.CONNECTION_NETWORK_MAC, "b4:8a:0a:92:7a:f4") in device.connections
+    assert device.serial_number == "IBSKCAAA"
+
+
+async def test_device_info_omits_mac_when_not_available(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+    device_registry: dr.DeviceRegistry,
+) -> None:
+    """Test device info has no MAC connection when mac is not set."""
+    player = _make_player()
+    mock_yoto_manager.players = {PLAYER_ID: player}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    device = device_registry.async_get_device(identifiers={("yoto", PLAYER_ID)})
+    assert device is not None
+    assert len(device.connections) == 0
+    assert device.serial_number is None

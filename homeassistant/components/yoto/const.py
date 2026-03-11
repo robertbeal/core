@@ -1,5 +1,3 @@
-"""Constants for Yoto."""
-
 from datetime import timedelta
 
 DOMAIN = "yoto"

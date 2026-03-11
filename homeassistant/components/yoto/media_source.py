@@ -1,5 +1,3 @@
-"""Media source for Yoto."""
-
 from __future__ import annotations
 
 import logging
