@@ -24,7 +24,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import YotoConfigEntry
-from .const import DOMAIN
+from .const import CONTEXT_PLAYBACK, DOMAIN
 from .coordinator import YotoDataUpdateCoordinator
 
 PARALLEL_UPDATES = 1
@@ -90,7 +90,7 @@ class YotoMediaPlayerEntity(
         player_id: str,
     ) -> None:
         """Initialise the entity."""
-        super().__init__(coordinator)
+        super().__init__(coordinator, context=CONTEXT_PLAYBACK)
         self._player_id = player_id
         self._attr_unique_id = player_id
 

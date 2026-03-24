@@ -1,6 +1,6 @@
 """Tests for the Yoto coordinator."""
 
-from threading import Thread
+from threading import Event, Thread
 from unittest.mock import MagicMock
 
 from yoto_api import AuthenticationError, YotoPlayer, YotoPlayerConfig
@@ -691,6 +691,50 @@ async def test_mqtt_callback_skips_card_detail_when_chapter_known(
     mock_yoto_manager.update_card_detail.assert_not_called()
 
 
+async def test_mqtt_callback_skips_card_detail_when_chapter_key_mismatches(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test MQTT callback skips fetch when card has chapters but key format differs.
+
+    The API returns chapter keys like "03-1" but MQTT reports chapter_key
+    as "03". Once the card's chapters have been fetched, no further API
+    calls should be made regardless of whether the MQTT chapter_key
+    matches an exact key in card.chapters.
+    """
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+    mock_yoto_manager.library = {
+        "card-1": Card(
+            id="card-1",
+            title="Test Card",
+            chapters={
+                "03-1": Chapter(key="03-1", title="Chapter 3 Part 1"),
+                "03-2": Chapter(key="03-2", title="Chapter 3 Part 2"),
+            },
+        )
+    }
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # MQTT reports chapter_key="03" which doesn't match "03-1" or "03-2"
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="03",
+        playback_status="playing",
+    )
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    mock_yoto_manager.update_card_detail.assert_not_called()
+
+
 async def test_coordinator_parses_colon_separated_temperature(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -901,6 +945,221 @@ async def test_coordinator_parses_mac_and_registration_code(
     player = coordinator.data["player-1"]
     assert player.mac == "b4:8a:0a:92:7a:f4"
     assert player.registration_code == "IBSKCAAA"
+
+
+async def test_mqtt_callback_does_not_re_fetch_card_already_in_flight(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test repeated MQTT events do not re-fetch card details already requested.
+
+    When a player is actively playing, MQTT events arrive every few seconds
+    with position updates. Each event triggers _fetch_missing_card_details().
+    If the card is unknown (not in library), the first event should trigger
+    an API fetch, but subsequent events for the same card should not trigger
+    additional fetches until the first one completes or fails.
+    """
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Player starts playing an unknown card
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+
+    # Block the card detail fetch so it stays in-flight while events arrive
+    fetch_started = Event()
+    fetch_proceed = Event()
+
+    original_update = mock_yoto_manager.update_card_detail
+
+    def blocking_update(card_id: str) -> None:
+        fetch_started.set()
+        fetch_proceed.wait()
+        original_update(card_id)
+
+    mock_yoto_manager.update_card_detail = MagicMock(side_effect=blocking_update)
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+
+    # Fire 5 rapid MQTT events; the first triggers a fetch that blocks
+    for _ in range(5):
+        thread = Thread(target=mqtt_callback)
+        thread.start()
+        thread.join()
+
+    # Wait for the first fetch to start, then fire remaining events through
+    fetch_started.wait(timeout=2)
+    await hass.async_block_till_done()
+
+    # Let the blocked fetch complete
+    fetch_proceed.set()
+    await hass.async_block_till_done()
+
+    # Should only fetch the card detail ONCE, not 5 times
+    assert mock_yoto_manager.update_card_detail.call_count == 1
+
+
+async def test_mqtt_callback_fetches_each_unknown_card_once(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test MQTT events for different unknown cards each trigger one fetch.
+
+    When different cards are inserted, each unknown card should be fetched
+    exactly once, but the same card should not be re-fetched on subsequent
+    events.
+    """
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+
+    # Block card detail fetches so they stay in-flight while events arrive
+    fetch_started = Event()
+    fetch_proceed = Event()
+
+    def blocking_update(card_id: str) -> None:
+        fetch_started.set()
+        fetch_proceed.wait()
+
+    mock_yoto_manager.update_card_detail = MagicMock(side_effect=blocking_update)
+
+    # First card: multiple rapid events while fetch is in-flight
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+    for _ in range(3):
+        thread = Thread(target=mqtt_callback)
+        thread.start()
+        thread.join()
+
+    # Wait for first fetch to start, then release it
+    fetch_started.wait(timeout=2)
+    await hass.async_block_till_done()
+    fetch_proceed.set()
+    await hass.async_block_till_done()
+
+    assert mock_yoto_manager.update_card_detail.call_count == 1
+
+    # Reset for second card
+    fetch_started.clear()
+    fetch_proceed.clear()
+
+    # Second card: multiple rapid events while fetch is in-flight
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-2",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+    for _ in range(3):
+        thread = Thread(target=mqtt_callback)
+        thread.start()
+        thread.join()
+
+    fetch_started.wait(timeout=2)
+    await hass.async_block_till_done()
+    fetch_proceed.set()
+    await hass.async_block_till_done()
+
+    # Should have fetched each card exactly once (2 total, not 6)
+    assert mock_yoto_manager.update_card_detail.call_count == 2
+
+
+async def test_mqtt_update_only_notifies_playback_listeners(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test MQTT events only notify listeners registered with PLAYBACK context.
+
+    During playback, MQTT events arrive every few seconds with position
+    updates. These should only notify media player entities (registered
+    with CONTEXT_PLAYBACK), not sensors, lights, etc. (registered with
+    no context). This avoids ~27 entities re-evaluating their properties
+    when only the media player's position changed.
+    """
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+
+    # Register two mock listeners: one with PLAYBACK context, one without
+    from homeassistant.components.yoto.const import CONTEXT_PLAYBACK
+
+    playback_listener = MagicMock()
+    other_listener = MagicMock()
+
+    coordinator.async_add_listener(playback_listener, CONTEXT_PLAYBACK)
+    coordinator.async_add_listener(other_listener)
+
+    # Update playback state and fire MQTT event
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        playback_status="playing",
+        track_position=42,
+    )
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    # Playback listener should have been notified
+    playback_listener.assert_called()
+    # Non-playback listener should NOT have been notified
+    other_listener.assert_not_called()
+
+
+async def test_polling_update_notifies_all_listeners(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test polling refresh notifies all listeners regardless of context.
+
+    Unlike MQTT events (which are frequent and only affect playback),
+    polling updates fetch fresh data for all fields and should notify
+    every listener.
+    """
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+
+    from homeassistant.components.yoto.const import CONTEXT_PLAYBACK
+
+    playback_listener = MagicMock()
+    other_listener = MagicMock()
+
+    coordinator.async_add_listener(playback_listener, CONTEXT_PLAYBACK)
+    coordinator.async_add_listener(other_listener)
+
+    # Trigger a polling refresh (this uses async_set_updated_data internally)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    # Both listeners should have been notified
+    playback_listener.assert_called()
+    other_listener.assert_called()
 
 
 async def test_coordinator_handles_missing_mac_and_registration_code(

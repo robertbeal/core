@@ -51,6 +51,30 @@ async def test_media_player_idle_when_online(
     assert state.state == MediaPlayerState.IDLE
 
 
+async def test_media_player_registers_with_playback_context(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test media player entity registers with CONTEXT_PLAYBACK.
+
+    The media player should register its coordinator listener with
+    CONTEXT_PLAYBACK so that MQTT playback events only notify it,
+    not sensors/lights/etc.
+    """
+    from homeassistant.components.yoto.const import CONTEXT_PLAYBACK
+
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry.runtime_data.coordinator
+    contexts = list(coordinator.async_contexts())
+    assert CONTEXT_PLAYBACK in contexts
+
+
 async def test_media_player_playing_state(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,

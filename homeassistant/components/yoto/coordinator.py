@@ -23,7 +23,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import CONTEXT_PLAYBACK, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.manager = manager
         self.previous_players: set[str] = set()
         self._mqtt_connected = False
+        self._card_fetches_in_flight: set[str] = set()
 
     async def _async_setup(self) -> None:
         """Set up the coordinator."""
@@ -69,23 +70,41 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.hass.loop.call_soon_threadsafe(self._process_mqtt_update)
 
     def _process_mqtt_update(self) -> None:
-        """Process an MQTT update."""
+        """Process an MQTT update.
+
+        Updates data and notifies only playback listeners (media players).
+        Sensor, light, and other entities are not notified because MQTT
+        events arrive every few seconds during playback with position
+        updates that only affect the media player. All entities will be
+        updated on the next polling refresh.
+        """
         self._fetch_missing_card_details()
-        self.async_set_updated_data(self.manager.players)
+        self.data = self.manager.players
+        self.last_update_success = True
+        for update_callback, context in list(self._listeners.values()):
+            if context == CONTEXT_PLAYBACK:
+                update_callback()
 
     def _fetch_missing_card_details(self) -> None:
         """Fetch missing card details for playing cards."""
         for player in self.manager.players.values():
             card_id = player.card_id
-            chapter_key = player.chapter_key
-            if not card_id or not chapter_key:
+            if not card_id or not player.chapter_key:
+                continue
+            if card_id in self._card_fetches_in_flight:
                 continue
 
             card = self.manager.library.get(card_id)
-            if card is None or not card.chapters or chapter_key not in card.chapters:
-                self.hass.async_add_executor_job(
-                    self.manager.update_card_detail, card_id
-                )
+            if card is None or not card.chapters:
+                self._card_fetches_in_flight.add(card_id)
+                self.hass.async_add_executor_job(self._fetch_card_detail, card_id)
+
+    def _fetch_card_detail(self, card_id: str) -> None:
+        """Fetch card details and clear the in-flight marker."""
+        try:
+            self.manager.update_card_detail(card_id)
+        finally:
+            self._card_fetches_in_flight.discard(card_id)
 
     def _update_all_players(self) -> None:
         """Fetch devices and update each player's status and config safely.
