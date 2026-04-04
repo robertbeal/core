@@ -1162,6 +1162,81 @@ async def test_polling_update_notifies_all_listeners(
     other_listener.assert_called()
 
 
+async def test_mqtt_callback_does_not_refetch_card_after_first_fetch(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test card detail is only fetched once per playback session.
+
+    When a card is not in the library, the first MQTT event should
+    trigger a fetch. Subsequent MQTT events for the same card on the
+    same player must not trigger another fetch. When a different card
+    starts playing and then the original card is re-inserted, a new
+    fetch should be triggered.
+    """
+    mock_yoto_manager.players = {PLAYER_ID: _make_player()}
+    mock_yoto_manager.library = {}
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+
+    mqtt_callback = mock_yoto_manager.connect_to_events.call_args[0][0]
+
+    # First MQTT event triggers a fetch
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    assert mock_yoto_manager.update_card_detail.call_count == 1
+
+    # Subsequent MQTT events for the same card should NOT re-fetch
+    for _ in range(5):
+        thread = Thread(target=mqtt_callback)
+        thread.start()
+        thread.join()
+    await hass.async_block_till_done()
+
+    assert mock_yoto_manager.update_card_detail.call_count == 1
+
+    # A different card starts playing
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-2",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    assert mock_yoto_manager.update_card_detail.call_count == 2
+
+    # Original card is re-inserted -- should fetch again (content may
+    # have changed, e.g. a playlist card was updated)
+    mock_yoto_manager.players[PLAYER_ID] = _make_player(
+        card_id="card-1",
+        chapter_key="ch-01",
+        playback_status="playing",
+    )
+
+    thread = Thread(target=mqtt_callback)
+    thread.start()
+    thread.join()
+    await hass.async_block_till_done()
+
+    assert mock_yoto_manager.update_card_detail.call_count == 3
+
+
 async def test_coordinator_handles_missing_mac_and_registration_code(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,

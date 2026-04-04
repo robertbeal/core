@@ -53,7 +53,7 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
         self.manager = manager
         self.previous_players: set[str] = set()
         self._mqtt_connected = False
-        self._card_fetches_in_flight: set[str] = set()
+        self._last_fetched_card: dict[str, str] = {}
 
     async def _async_setup(self) -> None:
         """Set up the coordinator."""
@@ -86,25 +86,28 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
                 update_callback()
 
     def _fetch_missing_card_details(self) -> None:
-        """Fetch missing card details for playing cards."""
-        for player in self.manager.players.values():
+        """Fetch card details once per playback session.
+
+        During playback MQTT events arrive every few seconds. We only
+        fetch card details when the active card changes on a player,
+        not on every event. This prevents repeated API calls for the
+        same card during continuous playback.
+        """
+        for player_id, player in self.manager.players.items():
             card_id = player.card_id
             if not card_id or not player.chapter_key:
                 continue
-            if card_id in self._card_fetches_in_flight:
+            if self._last_fetched_card.get(player_id) == card_id:
                 continue
 
             card = self.manager.library.get(card_id)
             if card is None or not card.chapters:
-                self._card_fetches_in_flight.add(card_id)
+                self._last_fetched_card[player_id] = card_id
                 self.hass.async_add_executor_job(self._fetch_card_detail, card_id)
 
     def _fetch_card_detail(self, card_id: str) -> None:
-        """Fetch card details and clear the in-flight marker."""
-        try:
-            self.manager.update_card_detail(card_id)
-        finally:
-            self._card_fetches_in_flight.discard(card_id)
+        """Fetch card details from the API."""
+        self.manager.update_card_detail(card_id)
 
     def _update_all_players(self) -> None:
         """Fetch devices and update each player's status and config safely.
