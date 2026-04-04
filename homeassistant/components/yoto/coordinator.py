@@ -142,6 +142,9 @@ class YotoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, YotoPlayer]]):
             players[device_id].device_type = get_child_value(device, "deviceType")
             players[device_id].online = get_child_value(device, "online")
 
+            if not players[device_id].online:
+                continue
+
             self._refresh_single_player(device_id)
 
     def _refresh_single_player(self, player_id: str) -> None:

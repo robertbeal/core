@@ -511,6 +511,49 @@ async def test_coordinator_handles_config_failure_for_one_player(
     assert player2.config.day_max_volume_limit == 10
 
 
+async def test_coordinator_skips_config_fetch_for_offline_players(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_yoto_manager: MagicMock,
+) -> None:
+    """Test coordinator does not fetch config for offline players.
+
+    Fetching config/status for offline players is wasteful -- the data
+    will be stale and the config won't have changed. Only online players
+    should have their config endpoint called.
+    """
+    mock_yoto_manager.api._get_devices.return_value = {
+        "devices": [
+            {
+                "deviceId": "player-1",
+                "name": "Lounge Yoto",
+                "deviceType": "v3",
+                "online": True,
+            },
+            {
+                "deviceId": "player-2",
+                "name": "Bedroom Yoto",
+                "deviceType": "v3",
+                "online": False,
+            },
+        ]
+    }
+    mock_yoto_manager.api._get_device_config.return_value = _make_config_response()
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    # Config should only be fetched for the online player
+    mock_yoto_manager.api._get_device_config.assert_called_once()
+    call_args = mock_yoto_manager.api._get_device_config.call_args
+    assert (
+        "player-1" in call_args.args or call_args.kwargs.get("player_id") == "player-1"
+    )
+
+
 async def test_coordinator_persists_token_when_player_update_fails(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
